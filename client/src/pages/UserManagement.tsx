@@ -1,607 +1,1088 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
 import {
-  UserPlusIcon,
-  PencilIcon,
-  TrashIcon,
-  EyeIcon,
-  MagnifyingGlassIcon,
-  FunnelIcon,
-  UserGroupIcon,
+  UserPlusIcon, PencilIcon, TrashIcon, EyeIcon,
+  MagnifyingGlassIcon, UserGroupIcon, XMarkIcon,
+  CheckCircleIcon, ExclamationCircleIcon, ScaleIcon,
+  BanknotesIcon, CurrencyDollarIcon, PhotoIcon,
+  ArrowUpTrayIcon, ArrowDownTrayIcon, AdjustmentsHorizontalIcon,
+  PlusIcon, ChevronDownIcon, ChevronUpIcon,
 } from '@heroicons/react/24/outline';
 
+const _API_BASE = (process.env.REACT_APP_API_URL || 'http://localhost:5001/api').replace(/\/api\/?$/, '');
+const toAbsUrl = (p: string) => p.startsWith('http') ? p : `${_API_BASE}${p}`;
+
 interface User {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  role: 'admin' | 'reseller' | 'user';
-  isActive: boolean;
-  createdAt: string;
-  lastLogin?: string;
-  clients?: string[];
+  id: string; firstName: string; lastName: string; email: string;
+  role: 'admin' | 'reseller' | 'user'; isActive: boolean; createdAt: string;
 }
+interface RateTier { minLbs: number; maxLbs: number | null; rate: number; }
+interface VendorAccess {
+  vendorId: string; vendorName: string; carrier: string;
+  vendorType: 'api' | 'manifest';
+  shippingService: string; baseRate: number; isAllowed: boolean; rateTiers: RateTier[];
+}
+interface Balance {
+  currentBalance: number;
+  recentTransactions: Array<{ type: string; amount: number; description: string; date: string }>;
+}
+interface Wallet {
+  _id: string; name: string; description: string; isActive: boolean;
+}
+interface PaymentLog {
+  _id: string; amount: number; date: string; note: string;
+  screenshots: string[];
+  loggedBy?: { firstName: string; lastName: string };
+  wallet?: { _id: string; name: string } | null;
+}
+type ActiveTab = 'edit' | 'balance' | 'tiers';
+type BalAction = '' | 'topup' | 'deduct' | 'adjust';
+
+const CARRIERS_ORDER = ['USPS', 'UPS', 'FedEx', 'DHL'];
+
+const CARRIER_BG: Record<string, { border: string; headerBg: string }> = {
+  USPS:  { border: 'rgba(0,75,135,0.22)',  headerBg: 'rgba(0,75,135,0.07)'  },
+  UPS:   { border: 'rgba(75,20,0,0.22)',   headerBg: 'rgba(75,20,0,0.08)'   },
+  FedEx: { border: 'rgba(77,20,140,0.22)', headerBg: 'rgba(77,20,140,0.07)' },
+  DHL:   { border: 'rgba(212,5,17,0.22)',  headerBg: 'rgba(255,204,0,0.18)' },
+};
+
+const CarrierBadge: React.FC<{ carrier: string }> = ({ carrier }) => {
+  const base: React.CSSProperties = { fontWeight: 900, fontSize: '0.78rem', letterSpacing: '0.07em', padding: '3px 8px', borderRadius: 5, display: 'inline-flex', alignItems: 'center' };
+  if (carrier === 'FedEx') return <span style={{ fontWeight: 900, fontSize: '0.88rem' }}><span style={{ color: '#4D148C' }}>Fed</span><span style={{ color: '#FF6600' }}>Ex</span></span>;
+  const s: Record<string, React.CSSProperties> = {
+    USPS: { background: '#004B87', color: '#fff' },
+    UPS:  { background: '#4B1400', color: '#FFB500' },
+    DHL:  { background: '#FFCC00', color: '#D40511' },
+  };
+  return <span style={{ ...base, ...(s[carrier] || { background: '#334155', color: '#fff' }) }}>{carrier}</span>;
+};
+
+const roleBadge = (r: string) =>
+  ({ admin: 'badge badge-red', reseller: 'badge badge-blue', user: 'badge badge-gray' }[r] ?? 'badge badge-gray');
+const txColor = (t: string) =>
+  ({ topup: 'var(--success-600)', deduction: 'var(--danger-600)', adjustment: '#2563EB' }[t] ?? 'var(--navy-600)');
+const txDot = (t: string) =>
+  ({ topup: 'green', deduction: 'red', adjustment: 'gray' }[t] ?? 'gray');
 
 const UserManagement: React.FC = () => {
-  const { user } = useAuth();
-  const [users, setUsers] = useState<User[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [roleFilter, setRoleFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
+  const { user: authUser } = useAuth();
 
-  const [userForm, setUserForm] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    password: '',
-    role: 'user' as 'admin' | 'reseller' | 'user',
-  });
+  // ── Users list ───────────────────────────────────────────────
+  const [users,        setUsers]        = useState<User[]>([]);
+  const [loadingList,  setLoadingList]  = useState(true);
+  const [searchTerm,   setSearchTerm]   = useState('');
+  const [roleFilter,   setRoleFilter]   = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [currentPage,  setCurrentPage]  = useState(1);
+  const [totalPages,   setTotalPages]   = useState(1);
+
+  // ── Right panel ──────────────────────────────────────────────
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [isCreating,   setIsCreating]   = useState(false);
+  const [activeTab,    setActiveTab]    = useState<ActiveTab>('edit');
+
+  // ── Edit/Create form ─────────────────────────────────────────
+  const blank: { firstName: string; lastName: string; email: string; password: string; role: 'admin' | 'reseller' | 'user'; source: string } = { firstName: '', lastName: '', email: '', password: '', role: 'user', source: '' };
+  const [userForm,    setUserForm]    = useState(blank);
+  const [submitting,  setSubmitting]  = useState(false);
+
+  // ── Balance tab ──────────────────────────────────────────────
+  const [balance,      setBalance]      = useState<Balance | null>(null);
+  const [loadingBal,   setLoadingBal]   = useState(false);
+  const [balAction,    setBalAction]    = useState<BalAction>('');
+  const [actionAmt,    setActionAmt]    = useState('');
+  const [actionDesc,   setActionDesc]   = useState('');
+  const [processingBal,setProcessingBal]= useState(false);
+
+  // ── Wallets ──────────────────────────────────────────────────
+  const [wallets,           setWallets]          = useState<Wallet[]>([]);
+  const [isSalesAgentClient,setIsSalesAgentClient] = useState(false);
+
+  // ── Payment logs ─────────────────────────────────────────────
+  const [payLogs,       setPayLogs]      = useState<PaymentLog[]>([]);
+  const [totalPaid,     setTotalPaid]    = useState(0);
+  const [showPayForm,   setShowPayForm]  = useState(false);
+  const [editPayLog,    setEditPayLog]   = useState<PaymentLog | null>(null);
+  const [payAmt,        setPayAmt]       = useState('');
+  const [payDate,       setPayDate]      = useState(new Date().toISOString().slice(0, 10));
+  const [payNote,       setPayNote]      = useState('');
+  const [payWallet,     setPayWallet]    = useState('');
+  const [payFiles,      setPayFiles]     = useState<File[]>([]);
+  const [payRemove,     setPayRemove]    = useState<string[]>([]);
+  const [savingPay,     setSavingPay]    = useState(false);
+  const payFileRef = useRef<HTMLInputElement>(null);
+
+  // ── Rate Tiers tab ───────────────────────────────────────────
+  const [access,        setAccess]       = useState<VendorAccess[]>([]);
+  const [loadingTiers,  setLoadingTiers] = useState(false);
+  const [savingTiers,   setSavingTiers]  = useState(false);
+  const [expandedCarriers, setExpandedCarriers] = useState<Record<string, boolean>>({});
+  const [expandedV,        setExpandedV]        = useState<Record<string, boolean>>({});
+
+  // ── Manifest vendor CRUD (inline in Rate Tiers) ──────────────
+  const [addingForCarrier,  setAddingForCarrier]  = useState('');   // carrier currently being added to
+  const [newVendorName,     setNewVendorName]     = useState('');
+  const [savingVendor,      setSavingVendor]      = useState(false);
+  const [editingVendorId,   setEditingVendorId]   = useState('');
+  const [editingVendorName, setEditingVendorName] = useState('');
+
+  // ── Notifications ────────────────────────────────────────────
+  const [message, setMessage] = useState('');
+  const [error,   setError]   = useState('');
+
+  useEffect(() => { fetchUsers(); }, [currentPage, roleFilter, statusFilter]);
+  useEffect(() => { fetchWallets(); }, []);
 
   useEffect(() => {
-    fetchUsers();
-  }, [currentPage, roleFilter, statusFilter]);
+    if (!selectedUser || isCreating) return;
+    if (activeTab === 'balance') { fetchBalance(selectedUser.id); fetchPayLogs(selectedUser.id); }
+    if (activeTab === 'tiers')   fetchTiers(selectedUser.id);
+  }, [activeTab, selectedUser]);
 
-  // Role-based access control
-  if (user?.role !== 'admin') {
-    return <Navigate to="/dashboard" replace />;
-  }
+  useEffect(() => {
+    if (message || error) {
+      const t = setTimeout(() => { setMessage(''); setError(''); }, 4000);
+      return () => clearTimeout(t);
+    }
+  }, [message, error]);
 
+  if (authUser?.role !== 'admin') return <Navigate to="/dashboard" replace />;
+
+  // ── API calls ────────────────────────────────────────────────
   const fetchUsers = async () => {
+    setLoadingList(true);
     try {
-      const params = new URLSearchParams({
-        page: currentPage.toString(),
-        limit: '10',
-      });
-
-      if (roleFilter) params.append('role', roleFilter);
-      if (statusFilter) params.append('isActive', statusFilter);
-
-      const response = await axios.get(`/users?${params}`);
-      setUsers(response.data.users);
-      setTotalPages(response.data.totalPages);
-    } catch (error) {
-      console.error('Error fetching users:', error);
-    } finally {
-      setIsLoading(false);
-    }
+      const p = new URLSearchParams({ page: String(currentPage), limit: '20' });
+      if (roleFilter)   p.append('role', roleFilter);
+      if (statusFilter) p.append('isActive', statusFilter);
+      const res = await axios.get(`/users?${p}`);
+      setUsers(res.data.users);
+      setTotalPages(res.data.totalPages);
+    } catch (e) { console.error(e); }
+    finally { setLoadingList(false); }
   };
 
-  const handleCreateUser = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    setError('');
-    setMessage('');
-
+  const fetchWallets = async () => {
     try {
-      await axios.post('/users', userForm);
-      setMessage('User created successfully');
-      setShowCreateModal(false);
-      setUserForm({
-        firstName: '',
-        lastName: '',
-        email: '',
-        password: '',
-        role: 'user',
-      });
-      fetchUsers();
-    } catch (error: any) {
-      setError(error.response?.data?.message || 'Failed to create user');
-    } finally {
-      setIsSubmitting(false);
-    }
+      const res = await axios.get('/wallets');
+      setWallets(res.data.wallets || []);
+    } catch {}
   };
 
-  const handleEditUser = async (e: React.FormEvent) => {
+  const fetchBalance = async (id: string) => {
+    setLoadingBal(true);
+    try {
+      const res = await axios.get(`/balance/${id}`);
+      setBalance(res.data);
+    } catch {}
+    finally { setLoadingBal(false); }
+  };
+
+  const fetchPayLogs = async (id: string) => {
+    try {
+      const res = await axios.get(`/payment-logs/${id}`);
+      setPayLogs(res.data.logs || []);
+      setTotalPaid(res.data.totalPaid || 0);
+      setIsSalesAgentClient(res.data.isSalesAgentClient || false);
+    } catch {}
+  };
+
+  const openPayForm = (log?: PaymentLog) => {
+    setEditPayLog(log ?? null);
+    setPayAmt(log ? String(log.amount) : '');
+    setPayDate(log ? log.date.slice(0, 10) : new Date().toISOString().slice(0, 10));
+    setPayNote(log?.note ?? '');
+    setPayWallet(log?.wallet?._id ?? '');
+    setPayFiles([]);
+    setPayRemove([]);
+    setShowPayForm(true);
+  };
+
+  const submitPayLog = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedUser) return;
+    setSavingPay(true);
+    try {
+      const fd = new FormData();
+      fd.append('userId', selectedUser.id);
+      fd.append('amount', payAmt);
+      fd.append('date', payDate);
+      fd.append('note', payNote);
+      if (isSalesAgentClient) fd.append('walletId', payWallet);
+      payFiles.forEach(f => fd.append('screenshots', f));
+      payRemove.forEach(u => fd.append('removeScreenshots', u));
+      if (editPayLog) {
+        await axios.put(`/payment-logs/${editPayLog._id}`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      } else {
+        await axios.post('/payment-logs', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      }
+      setShowPayForm(false);
+      fetchPayLogs(selectedUser.id);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Save failed');
+    } finally { setSavingPay(false); }
+  };
 
-    setIsSubmitting(true);
-    setError('');
-    setMessage('');
+  const deletePayLog = async (id: string) => {
+    if (!selectedUser || !window.confirm('Delete this payment entry?')) return;
+    try {
+      await axios.delete(`/payment-logs/${id}`);
+      fetchPayLogs(selectedUser.id);
+    } catch {}
+  };
 
+  const fetchTiers = async (id: string) => {
+    setLoadingTiers(true);
+    try {
+      const res = await axios.get(`/access/${id}`);
+      setAccess(res.data.access);
+    } catch {}
+    finally { setLoadingTiers(false); }
+  };
+
+  // ── User actions ─────────────────────────────────────────────
+  const selectUser = (u: User) => {
+    setSelectedUser(u);
+    setUserForm({ firstName: u.firstName, lastName: u.lastName, email: u.email, password: '', role: u.role, source: (u as any).source || '' });
+    setIsCreating(false);
+    setActiveTab('edit');
+    setBalAction('');
+    setShowPayForm(false);
+    setPayLogs([]);
+    setTotalPaid(0);
+  };
+
+  const startCreate = () => {
+    setIsCreating(true);
+    setSelectedUser(null);
+    setUserForm(blank);
+    setActiveTab('edit');
+  };
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true); setError('');
+    try {
+      await axios.post('/users', userForm);
+      setMessage('User created'); setIsCreating(false); setUserForm(blank); fetchUsers();
+    } catch (err: any) { setError(err.response?.data?.message || 'Failed to create'); }
+    finally { setSubmitting(false); }
+  };
+
+  const handleEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedUser) return;
+    setSubmitting(true); setError('');
     try {
       await axios.put(`/users/${selectedUser.id}`, {
-        firstName: userForm.firstName,
-        lastName: userForm.lastName,
-        email: userForm.email,
-        role: userForm.role,
+        firstName: userForm.firstName, lastName: userForm.lastName,
+        email: userForm.email, role: userForm.role, source: userForm.source || null,
       });
-      setMessage('User updated successfully');
-      setShowEditModal(false);
-      setSelectedUser(null);
+      setMessage('Saved');
+      setSelectedUser(prev => prev ? { ...prev, ...userForm } : null);
       fetchUsers();
-    } catch (error: any) {
-      setError(error.response?.data?.message || 'Failed to update user');
-    } finally {
-      setIsSubmitting(false);
-    }
+    } catch (err: any) { setError(err.response?.data?.message || 'Failed to update'); }
+    finally { setSubmitting(false); }
   };
 
-  const handleDeleteUser = async (userId: string) => {
-    if (!window.confirm('Are you sure you want to delete this user?')) return;
-
+  const handleDelete = async (u: User) => {
+    if (!window.confirm(`Delete ${u.firstName} ${u.lastName}?`)) return;
     try {
-      await axios.delete(`/users/${userId}`);
-      setMessage('User deleted successfully');
+      await axios.delete(`/users/${u.id}`);
+      setMessage('User deleted');
+      if (selectedUser?.id === u.id) { setSelectedUser(null); setIsCreating(false); }
       fetchUsers();
-    } catch (error: any) {
-      setError(error.response?.data?.message || 'Failed to delete user');
-    }
+    } catch (err: any) { setError(err.response?.data?.message || 'Failed'); }
   };
 
-  const handleToggleUserStatus = async (userId: string, isActive: boolean) => {
+  const handleToggleStatus = async (u: User) => {
     try {
-      await axios.put(`/users/${userId}`, { isActive: !isActive });
-      setMessage(`User ${!isActive ? 'activated' : 'deactivated'} successfully`);
+      await axios.put(`/users/${u.id}`, { isActive: !u.isActive });
+      setMessage(`User ${!u.isActive ? 'activated' : 'deactivated'}`);
       fetchUsers();
-    } catch (error: any) {
-      setError(error.response?.data?.message || 'Failed to update user status');
-    }
+      if (selectedUser?.id === u.id) setSelectedUser({ ...u, isActive: !u.isActive });
+    } catch (err: any) { setError(err.response?.data?.message || 'Failed'); }
   };
 
-  const openEditModal = (user: User) => {
-    setSelectedUser(user);
-    setUserForm({
-      firstName: user.firstName,
-      lastName: user.lastName,
-      email: user.email,
-      password: '',
-      role: user.role,
-    });
-    setShowEditModal(true);
+  // ── Balance actions ──────────────────────────────────────────
+  const doBalanceAction = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedUser || !balAction) return;
+    setProcessingBal(true);
+    try {
+      const ep = { topup: '/balance/topup', deduct: '/balance/deduct', adjust: '/balance/adjust' }[balAction]!;
+      await axios.post(ep, { userId: selectedUser.id, amount: parseFloat(actionAmt), description: actionDesc || `${balAction} by ${authUser?.firstName}` });
+      setMessage('Balance updated');
+      setBalAction(''); setActionAmt(''); setActionDesc('');
+      fetchBalance(selectedUser.id);
+    } catch (err: any) { setError(err.response?.data?.message || 'Failed'); }
+    finally { setProcessingBal(false); }
   };
 
-  const filteredUsers = users.filter((user) =>
-    `${user.firstName} ${user.lastName} ${user.email}`.toLowerCase().includes(searchTerm.toLowerCase())
+  // ── Tiers save ───────────────────────────────────────────────
+  const saveTiers = async () => {
+    if (!selectedUser) return;
+    setSavingTiers(true);
+    try {
+      const records = access.map(v => ({ vendorId: v.vendorId, carrier: v.carrier, isAllowed: v.isAllowed, rateTiers: v.rateTiers }));
+      await axios.put(`/access/${selectedUser.id}/bulk/save`, { records });
+      setMessage('Rate tiers saved');
+    } catch (err: any) { setError(err.response?.data?.message || 'Failed to save'); }
+    finally { setSavingTiers(false); }
+  };
+
+  const updateTierField = (vendorId: string, ti: number, field: string, val: any) =>
+    setAccess(a => a.map(v => v.vendorId !== vendorId ? v : {
+      ...v, rateTiers: v.rateTiers.map((t, i) => i === ti ? { ...t, [field]: val } : t)
+    }));
+
+  const addManifestVendor = async (carrier: string) => {
+    if (!newVendorName.trim()) return;
+    setSavingVendor(true);
+    try {
+      await axios.post('/vendors', { name: newVendorName.trim(), carrier, rate: 0, vendorType: 'manifest', source: 'manual' });
+      setNewVendorName(''); setAddingForCarrier('');
+      if (selectedUser) fetchTiers(selectedUser.id);
+    } catch (err: any) { setError(err.response?.data?.message || 'Failed to add vendor'); }
+    finally { setSavingVendor(false); }
+  };
+
+  const saveManifestVendorName = async (vendorId: string) => {
+    if (!editingVendorName.trim()) return;
+    try {
+      await axios.put(`/vendors/${vendorId}`, { name: editingVendorName.trim(), vendorType: 'manifest' });
+      setEditingVendorId('');
+      if (selectedUser) fetchTiers(selectedUser.id);
+    } catch (err: any) { setError(err.response?.data?.message || 'Failed to update vendor'); }
+  };
+
+  const deleteManifestVendor = async (vendorId: string, vendorName: string) => {
+    if (!window.confirm(`Delete vendor "${vendorName}"? This will remove all rate tiers for this vendor.`)) return;
+    try {
+      await axios.delete(`/vendors/${vendorId}`);
+      if (selectedUser) fetchTiers(selectedUser.id);
+    } catch (err: any) { setError(err.response?.data?.message || 'Failed to delete vendor'); }
+  };
+
+  const filtered = users.filter(u =>
+    `${u.firstName} ${u.lastName} ${u.email}`.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+  const fmt = (v?: number) => `$${(v ?? 0).toFixed(2)}`;
+
+  // ── Tab component ────────────────────────────────────────────
+  const Tab = ({ id, label, icon }: { id: ActiveTab; label: string; icon: React.ReactNode }) => (
+    <button
+      onClick={() => setActiveTab(id)}
+      style={{
+        padding: '0.5rem 0.875rem', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer',
+        border: 'none', background: 'none', whiteSpace: 'nowrap',
+        borderBottom: activeTab === id ? '2px solid var(--accent-600)' : '2px solid transparent',
+        color: activeTab === id ? 'var(--accent-700)' : 'var(--navy-500)',
+        display: 'inline-flex', alignItems: 'center', gap: 5, transition: 'color 0.15s',
+      }}
+    >
+      {icon} {label}
+    </button>
   );
 
-  const getRoleColor = (role: string) => {
-    switch (role) {
-      case 'admin':
-        return 'bg-red-100 text-red-800';
-      case 'reseller':
-        return 'bg-blue-100 text-blue-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
+  const balActionCls: Record<string, string> = {
+    topup: 'btn-success', deduct: 'btn-danger', adjust: 'btn-ghost',
   };
 
+  // ── Render ───────────────────────────────────────────────────
   return (
-    <div className="space-y-6">
+    <div className="animate-fadeIn" style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem', height: '100%' }}>
+
       {/* Header */}
-      <div className="sm:flex sm:items-center sm:justify-between">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Manage users, roles, and permissions.
-          </p>
+          <h1 className="page-title" style={{ margin: 0 }}>User Management</h1>
+          <p className="page-subtitle" style={{ margin: 0 }}>Select a user to edit, manage balance, or configure rate tiers.</p>
         </div>
-        <div className="mt-4 sm:mt-0">
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-          >
-            <UserPlusIcon className="h-4 w-4 mr-2" />
-            Add User
+        <button className="btn btn-primary btn-sm" onClick={startCreate}>
+          <UserPlusIcon style={{ width: 14, height: 14 }} /> New User
+        </button>
+      </div>
+
+      {/* Toast notifications */}
+      {(message || error) && (
+        <div className={`alert ${message ? 'alert-success' : 'alert-danger'}`} style={{ padding: '0.5rem 0.875rem' }}>
+          {message
+            ? <CheckCircleIcon style={{ width: 15, height: 15, flexShrink: 0 }} />
+            : <ExclamationCircleIcon style={{ width: 15, height: 15, flexShrink: 0 }} />
+          }
+          <span style={{ fontSize: '0.82rem' }}>{message || error}</span>
+          <button onClick={() => { setMessage(''); setError(''); }} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', padding: 2 }}>
+            <XMarkIcon style={{ width: 13, height: 13 }} />
           </button>
         </div>
-      </div>
-
-      {/* Messages */}
-      {message && (
-        <div className="rounded-md bg-green-50 p-4">
-          <div className="text-sm text-green-700">{message}</div>
-        </div>
       )}
 
-      {error && (
-        <div className="rounded-md bg-red-50 p-4">
-          <div className="text-sm text-red-700">{error}</div>
-        </div>
-      )}
+      {/* Main 2-column layout */}
+      <div style={{ display: 'grid', gridTemplateColumns: '250px 1fr', gap: '0.875rem', flex: 1, minHeight: 0 }}>
 
-      {/* Filters */}
-      <div className="bg-white p-4 rounded-lg shadow">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
-          <div>
-            <label htmlFor="search" className="block text-sm font-medium text-gray-700">
-              Search
-            </label>
-            <div className="mt-1 relative rounded-md shadow-sm">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
-              </div>
+        {/* ── LEFT: User List ───────────────────────────────── */}
+        <div className="sh-card" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
+
+          {/* Search + compact filters */}
+          <div style={{ padding: '0.625rem', borderBottom: '1px solid var(--navy-100)', display: 'flex', flexDirection: 'column', gap: 5 }}>
+            <div style={{ position: 'relative' }}>
+              <MagnifyingGlassIcon style={{ position: 'absolute', left: 7, top: '50%', transform: 'translateY(-50%)', width: 13, height: 13, color: 'var(--navy-400)', pointerEvents: 'none' }} />
               <input
-                type="text"
-                name="search"
-                id="search"
-                className="focus:ring-primary-500 focus:border-primary-500 block w-full pl-10 sm:text-sm border-gray-300 rounded-md"
-                placeholder="Search users..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                type="text" className="form-input"
+                style={{ paddingLeft: '1.75rem', fontSize: '0.78rem', padding: '0.375rem 0.5rem 0.375rem 1.75rem' }}
+                placeholder="Search users…" value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
               />
             </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+              <select className="form-input form-select" style={{ fontSize: '0.72rem', padding: '0.3rem 0.375rem' }}
+                value={roleFilter} onChange={e => { setRoleFilter(e.target.value); setCurrentPage(1); }}>
+                <option value="">All Roles</option>
+                <option value="admin">Admin</option>
+                <option value="reseller">Reseller</option>
+                <option value="user">User</option>
+              </select>
+              <select className="form-input form-select" style={{ fontSize: '0.72rem', padding: '0.3rem 0.375rem' }}
+                value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setCurrentPage(1); }}>
+                <option value="">All Status</option>
+                <option value="true">Active</option>
+                <option value="false">Inactive</option>
+              </select>
+            </div>
           </div>
 
-          <div>
-            <label htmlFor="role-filter" className="block text-sm font-medium text-gray-700">
-              Role
-            </label>
-            <select
-              id="role-filter"
-              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md"
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
-            >
-              <option value="">All Roles</option>
-              <option value="admin">Admin</option>
-              <option value="reseller">Reseller</option>
-              <option value="user">User</option>
-            </select>
-          </div>
-
-          <div>
-            <label htmlFor="status-filter" className="block text-sm font-medium text-gray-700">
-              Status
-            </label>
-            <select
-              id="status-filter"
-              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <option value="">All Status</option>
-              <option value="true">Active</option>
-              <option value="false">Inactive</option>
-            </select>
-          </div>
-
-          <div className="flex items-end">
-            <button
-              onClick={() => {
-                setSearchTerm('');
-                setRoleFilter('');
-                setStatusFilter('');
-              }}
-              className="w-full inline-flex justify-center items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-            >
-              <FunnelIcon className="h-4 w-4 mr-2" />
-              Clear Filters
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Users Table */}
-      <div className="bg-white shadow overflow-hidden sm:rounded-md">
-        {isLoading ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-          </div>
-        ) : filteredUsers.length === 0 ? (
-          <div className="text-center py-12">
-            <UserGroupIcon className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-sm font-medium text-gray-900">No users</h3>
-            <p className="mt-1 text-sm text-gray-500">
-              Get started by creating a new user.
-            </p>
-          </div>
-        ) : (
-          <ul className="divide-y divide-gray-200">
-            {filteredUsers.map((userItem) => (
-              <li key={userItem.id}>
-                <div className="px-4 py-4 flex items-center justify-between">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                      <div className="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center">
-                        <span className="text-sm font-medium text-primary-600">
-                          {userItem.firstName.charAt(0)}{userItem.lastName.charAt(0)}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="ml-4">
-                      <div className="text-sm font-medium text-gray-900">
-                        {userItem.firstName} {userItem.lastName}
-                      </div>
-                      <div className="text-sm text-gray-500">{userItem.email}</div>
-                      <div className="text-xs text-gray-400">
-                        Created: {new Date(userItem.createdAt).toLocaleDateString()}
-                        {userItem.lastLogin && ` • Last login: ${new Date(userItem.lastLogin).toLocaleDateString()}`}
-                      </div>
-                    </div>
+          {/* User rows */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '0.25rem' }}>
+            {loadingList ? (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '2rem' }}><div className="spinner" /></div>
+            ) : filtered.length === 0 ? (
+              <p style={{ textAlign: 'center', color: 'var(--navy-400)', fontSize: '0.78rem', padding: '1.5rem 0' }}>No users found</p>
+            ) : filtered.map(u => (
+              <div
+                key={u.id}
+                onClick={() => selectUser(u)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 7, padding: '0.45rem 0.5rem',
+                  borderRadius: 6, cursor: 'pointer', marginBottom: 1,
+                  background: selectedUser?.id === u.id && !isCreating ? 'var(--accent-50)' : 'transparent',
+                  border: `1.5px solid ${selectedUser?.id === u.id && !isCreating ? 'var(--accent-200)' : 'transparent'}`,
+                  transition: 'background 0.1s, border-color 0.1s',
+                }}
+              >
+                <div className={`avatar avatar-sm ${u.isActive ? 'avatar-indigo' : ''}`}
+                  style={!u.isActive ? { background: 'var(--navy-200)', color: 'var(--navy-500)' } : {}}>
+                  {u.firstName.charAt(0)}{u.lastName.charAt(0)}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--navy-900)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {u.firstName} {u.lastName}
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleColor(
-                        userItem.role
-                      )}`}
-                    >
-                      {userItem.role}
-                    </span>
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        userItem.isActive
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}
-                    >
-                      {userItem.isActive ? 'Active' : 'Inactive'}
-                    </span>
-                    <div className="flex space-x-1">
-                      <button
-                        onClick={() => openEditModal(userItem)}
-                        className="text-primary-600 hover:text-primary-900"
-                        title="Edit User"
-                      >
-                        <PencilIcon className="h-5 w-5" />
-                      </button>
-                      <button
-                        onClick={() => handleToggleUserStatus(userItem.id, userItem.isActive)}
-                        className={`${
-                          userItem.isActive ? 'text-red-600 hover:text-red-900' : 'text-green-600 hover:text-green-900'
-                        }`}
-                        title={userItem.isActive ? 'Deactivate User' : 'Activate User'}
-                      >
-                        <EyeIcon className="h-5 w-5" />
-                      </button>
-                      {userItem.id !== user?.id && (
-                        <button
-                          onClick={() => handleDeleteUser(userItem.id)}
-                          className="text-red-600 hover:text-red-900"
-                          title="Delete User"
-                        >
-                          <TrashIcon className="h-5 w-5" />
-                        </button>
-                      )}
-                    </div>
+                  <div style={{ fontSize: '0.68rem', color: 'var(--navy-400)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {u.email}
                   </div>
                 </div>
-              </li>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2, flexShrink: 0 }}>
+                  <span className={roleBadge(u.role)} style={{ fontSize: '0.58rem', padding: '1px 4px' }}>{u.role}</span>
+                  <span className={`status-dot ${u.isActive ? 'green' : 'red'}`} />
+                </div>
+              </div>
             ))}
-          </ul>
-        )}
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div style={{ borderTop: '1px solid var(--navy-100)', padding: '0.375rem 0.625rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '0.68rem', color: 'var(--navy-400)' }}>{currentPage} / {totalPages}</span>
+              <div style={{ display: 'flex', gap: 3 }}>
+                <button className="btn btn-ghost btn-sm" style={{ padding: '1px 7px', fontSize: '0.75rem' }}
+                  disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}>‹</button>
+                <button className="btn btn-ghost btn-sm" style={{ padding: '1px 7px', fontSize: '0.75rem' }}
+                  disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)}>›</button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ── RIGHT: Detail Panel ───────────────────────────── */}
+        <div className="sh-card" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
+
+          {!selectedUser && !isCreating ? (
+            <div className="empty-state">
+              <UserGroupIcon style={{ width: 36, height: 36 }} />
+              <h3>Select a User</h3>
+              <p>Click any user on the left to edit, manage balance, or configure rate tiers — all without leaving this page.</p>
+              <button className="btn btn-primary btn-sm" onClick={startCreate}>
+                <UserPlusIcon style={{ width: 14, height: 14 }} /> Create first user
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Panel header */}
+              <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--navy-100)', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                {isCreating ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 7, flex: 1 }}>
+                    <UserPlusIcon style={{ width: 15, height: 15, color: 'var(--accent-600)' }} />
+                    <span style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--navy-900)' }}>New User</span>
+                  </div>
+                ) : selectedUser && (
+                  <>
+                    <div className={`avatar avatar-sm ${selectedUser.isActive ? 'avatar-indigo' : ''}`}
+                      style={!selectedUser.isActive ? { background: 'var(--navy-200)', color: 'var(--navy-500)' } : {}}>
+                      {selectedUser.firstName.charAt(0)}{selectedUser.lastName.charAt(0)}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--navy-900)' }}>
+                        {selectedUser.firstName} {selectedUser.lastName}
+                      </div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--navy-400)' }}>{selectedUser.email}</div>
+                    </div>
+                    <span className={roleBadge(selectedUser.role)} style={{ fontSize: '0.65rem' }}>{selectedUser.role}</span>
+                    <span className={`badge ${selectedUser.isActive ? 'badge-green' : 'badge-red'}`} style={{ fontSize: '0.65rem' }}>
+                      {selectedUser.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                    <button onClick={() => handleToggleStatus(selectedUser)} title={selectedUser.isActive ? 'Deactivate' : 'Activate'}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: selectedUser.isActive ? 'var(--danger-500)' : 'var(--success-600)', padding: 3 }}>
+                      <EyeIcon style={{ width: 15, height: 15 }} />
+                    </button>
+                    {selectedUser.id !== authUser?.id && (
+                      <button onClick={() => handleDelete(selectedUser)} title="Delete"
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger-500)', padding: 3 }}>
+                        <TrashIcon style={{ width: 15, height: 15 }} />
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* Tabs — only for existing users */}
+              {!isCreating && selectedUser && (
+                <div style={{ display: 'flex', borderBottom: '1px solid var(--navy-100)', padding: '0 0.75rem', flexShrink: 0, overflowX: 'auto' }}>
+                  <Tab id="edit"    label="Profile"       icon={<PencilIcon     style={{ width: 12, height: 12 }} />} />
+                  <Tab id="balance" label="Balance & Rate" icon={<BanknotesIcon  style={{ width: 12, height: 12 }} />} />
+                  <Tab id="tiers"   label="Rate Tiers"     icon={<ScaleIcon      style={{ width: 12, height: 12 }} />} />
+                </div>
+              )}
+
+              {/* Tab content */}
+              <div style={{ flex: 1, overflowY: 'auto', padding: '1rem' }}>
+
+                {/* ── EDIT / CREATE FORM ── */}
+                {(activeTab === 'edit' || isCreating) && (
+                  <form onSubmit={isCreating ? handleCreate : handleEdit} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxWidth: 480 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.625rem' }}>
+                      <div>
+                        <label className="form-label">First Name</label>
+                        <input type="text" required className="form-input" value={userForm.firstName}
+                          onChange={e => setUserForm({ ...userForm, firstName: e.target.value })} />
+                      </div>
+                      <div>
+                        <label className="form-label">Last Name</label>
+                        <input type="text" required className="form-input" value={userForm.lastName}
+                          onChange={e => setUserForm({ ...userForm, lastName: e.target.value })} />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="form-label">Email</label>
+                      <input type="email" required className="form-input" value={userForm.email}
+                        onChange={e => setUserForm({ ...userForm, email: e.target.value })} />
+                    </div>
+                    {isCreating && (
+                      <div>
+                        <label className="form-label">Password</label>
+                        <input type="password" required minLength={6} className="form-input" value={userForm.password}
+                          onChange={e => setUserForm({ ...userForm, password: e.target.value })} />
+                      </div>
+                    )}
+                    <div>
+                      <label className="form-label">Role</label>
+                      <select className="form-input form-select" value={userForm.role}
+                        onChange={e => setUserForm({ ...userForm, role: e.target.value as any })}>
+                        <option value="user">User</option>
+                        <option value="reseller">Reseller</option>
+                        <option value="admin">Admin</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="form-label">Source <span style={{ fontSize: '0.7rem', color: 'var(--navy-400)', fontWeight: 400 }}>(optional)</span></label>
+                      <select className="form-input form-select" value={userForm.source}
+                        onChange={e => setUserForm({ ...userForm, source: e.target.value })}>
+                        <option value="">— Not specified —</option>
+                        <option value="Organic">Organic</option>
+                        <option value="Paid Ads">Paid Ads</option>
+                      </select>
+                    </div>
+                    <div style={{ display: 'flex', gap: 7, paddingTop: 2 }}>
+                      {isCreating && (
+                        <button type="button" className="btn btn-ghost btn-sm" onClick={() => setIsCreating(false)}>Cancel</button>
+                      )}
+                      <button type="submit" disabled={submitting} className="btn btn-primary btn-sm">
+                        {submitting ? (isCreating ? 'Creating…' : 'Saving…') : (isCreating ? 'Create User' : 'Save Changes')}
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                {/* ── BALANCE & RATE TAB ── */}
+                {activeTab === 'balance' && selectedUser && (
+                  loadingBal ? (
+                    <div style={{ display: 'flex', justifyContent: 'center', padding: '2rem' }}><div className="spinner" /></div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+
+                      {/* Balance stats row */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.625rem' }}>
+                        <div style={{ background: 'var(--navy-25)', border: '1px solid var(--navy-100)', borderRadius: 10, padding: '0.875rem 1rem' }}>
+                          <div style={{ fontSize: '0.65rem', color: 'var(--navy-400)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <BanknotesIcon style={{ width: 11, height: 11 }} /> Current Balance
+                          </div>
+                          <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--navy-900)', letterSpacing: '-0.03em' }}>{fmt(balance?.currentBalance)}</div>
+                        </div>
+                        <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, padding: '0.875rem 1rem' }}>
+                          <div style={{ fontSize: '0.65rem', color: '#16a34a', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <CurrencyDollarIcon style={{ width: 11, height: 11 }} /> Total Paid
+                          </div>
+                          <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#15803d', letterSpacing: '-0.03em' }}>{fmt(totalPaid)}</div>
+                        </div>
+                      </div>
+
+                      {/* Action buttons */}
+                      <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                        {([
+                          { id: 'topup'  as BalAction, label: 'Top Up', icon: <ArrowUpTrayIcon style={{ width: 12, height: 12 }} /> },
+                          { id: 'deduct' as BalAction, label: 'Deduct', icon: <ArrowDownTrayIcon style={{ width: 12, height: 12 }} /> },
+                          { id: 'adjust' as BalAction, label: 'Adjust', icon: <AdjustmentsHorizontalIcon style={{ width: 12, height: 12 }} /> },
+                        ]).map(a => (
+                          <button
+                            key={a.id}
+                            className={`btn btn-sm ${balAction === a.id ? balActionCls[a.id] : 'btn-ghost'}`}
+                            onClick={() => setBalAction(balAction === a.id ? '' : a.id)}
+                          >
+                            {a.icon} {a.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Inline action form */}
+                      {balAction && (
+                        <form onSubmit={doBalanceAction} style={{
+                          background: 'var(--navy-25)', border: '1px solid var(--navy-100)',
+                          borderRadius: 10, padding: '0.875rem',
+                          display: 'flex', flexDirection: 'column', gap: '0.625rem',
+                        }}>
+                          <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--navy-700)', textTransform: 'capitalize' }}>
+                            {balAction === 'adjust' ? 'Adjust Balance (+ or −)' : `${balAction} Balance`}
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                            <div>
+                              <label className="form-label">{balAction === 'adjust' ? 'Amount (+ or −)' : 'Amount ($)'}</label>
+                              <input
+                                type="number" step="0.01" required className="form-input"
+                                min={balAction === 'adjust' ? undefined : '0.01'}
+                                value={actionAmt} onChange={e => setActionAmt(e.target.value)}
+                                placeholder="0.00" autoFocus
+                              />
+                            </div>
+                            <div>
+                              <label className="form-label">Description</label>
+                              <input type="text" className="form-input" value={actionDesc}
+                                onChange={e => setActionDesc(e.target.value)} placeholder="Optional" />
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <button type="button" className="btn btn-ghost btn-sm"
+                              onClick={() => { setBalAction(''); setActionAmt(''); setActionDesc(''); }}>
+                              Cancel
+                            </button>
+                            <button type="submit" disabled={processingBal}
+                              className={`btn btn-sm ${balActionCls[balAction as string] || 'btn-primary'}`}>
+                              {processingBal ? 'Processing…' : 'Confirm'}
+                            </button>
+                          </div>
+                        </form>
+                      )}
+
+                      {/* Transactions */}
+                      <div>
+                        <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--navy-400)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '0.375rem' }}>
+                          Recent Transactions
+                        </div>
+                        {!balance?.recentTransactions?.length ? (
+                          <p style={{ fontSize: '0.8rem', color: 'var(--navy-400)' }}>No transactions yet.</p>
+                        ) : balance.recentTransactions.slice(0, 8).map((tx, i) => (
+                          <div key={i} style={{
+                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                            padding: '0.4rem 0', borderBottom: i < 7 ? '1px solid var(--navy-50)' : 'none',
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                              <span className={`status-dot ${txDot(tx.type)}`} />
+                              <div>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--navy-800)' }}>{tx.description}</div>
+                                <div style={{ fontSize: '0.68rem', color: 'var(--navy-400)' }}>{new Date(tx.date).toLocaleDateString()}</div>
+                              </div>
+                            </div>
+                            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: txColor(tx.type) }}>
+                              {tx.type === 'deduction' ? '−' : '+'}{fmt(tx.amount)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* ── Payment Log ── */}
+                      <div style={{ borderTop: '1px solid var(--navy-100)', paddingTop: '0.75rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                          <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--navy-400)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                            Payment Received Log
+                          </div>
+                          <button className="btn btn-primary btn-sm" onClick={() => openPayForm()}>
+                            <PlusIcon style={{ width: 11, height: 11 }} /> Log Payment
+                          </button>
+                        </div>
+
+                        {/* Inline pay form */}
+                        {showPayForm && (
+                          <form onSubmit={submitPayLog} style={{
+                            background: 'var(--navy-25)', border: '1px solid var(--navy-100)',
+                            borderRadius: 10, padding: '0.75rem',
+                            display: 'flex', flexDirection: 'column', gap: '0.5rem',
+                            marginBottom: '0.625rem',
+                          }}>
+                            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#15803d' }}>
+                              {editPayLog ? 'Edit Payment Entry' : 'Log Payment Received'}
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                              <div>
+                                <label className="form-label">Amount ($)</label>
+                                <input type="number" step="0.01" min="0.01" required className="form-input"
+                                  value={payAmt} onChange={e => setPayAmt(e.target.value)} placeholder="0.00" autoFocus />
+                              </div>
+                              <div>
+                                <label className="form-label">Date</label>
+                                <input type="date" required className="form-input"
+                                  value={payDate} onChange={e => setPayDate(e.target.value)} />
+                              </div>
+                            </div>
+                            <div>
+                              <label className="form-label">Note</label>
+                              <input type="text" className="form-input"
+                                value={payNote} onChange={e => setPayNote(e.target.value)} placeholder="Wire, receipt #…" />
+                            </div>
+                            {isSalesAgentClient && (
+                              <div>
+                                <label className="form-label">Wallet</label>
+                                <select className="form-input" value={payWallet} onChange={e => setPayWallet(e.target.value)}>
+                                  <option value="">— Select wallet —</option>
+                                  {wallets.filter(w => w.isActive).map(w => (
+                                    <option key={w._id} value={w._id}>{w.name}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            )}
+
+                            {/* Existing screenshots (edit) */}
+                            {editPayLog && editPayLog.screenshots.filter(s => !payRemove.includes(s)).length > 0 && (
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                {editPayLog.screenshots.filter(s => !payRemove.includes(s)).map(url => (
+                                  <div key={url} style={{ position: 'relative' }}>
+                                    <img src={toAbsUrl(url)} alt="" style={{ width: 52, height: 52, objectFit: 'cover', borderRadius: 5, border: '1px solid var(--navy-100)' }}
+                                      onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                                    <button type="button" onClick={() => setPayRemove(r => [...r, url])}
+                                      style={{ position: 'absolute', top: -5, right: -5, background: '#dc2626', border: 'none', borderRadius: '50%', width: 16, height: 16, cursor: 'pointer', color: '#fff', fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                              <input type="file" ref={payFileRef} multiple accept="image/*,.pdf" style={{ display: 'none' }}
+                                onChange={e => setPayFiles(Array.from(e.target.files || []))} />
+                              <button type="button" className="btn btn-ghost btn-sm" onClick={() => payFileRef.current?.click()}>
+                                <PhotoIcon style={{ width: 12, height: 12 }} />
+                                {payFiles.length ? `${payFiles.length} file(s)` : 'Attach Screenshots'}
+                              </button>
+                              {payFiles.map((f, i) => (
+                                <span key={i} style={{ fontSize: '0.68rem', background: 'var(--navy-50)', padding: '2px 7px', borderRadius: 4, color: 'var(--navy-700)' }}>
+                                  {f.name} <button type="button" onClick={() => setPayFiles(fs => fs.filter((_, j) => j !== i))}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626', padding: 0 }}>×</button>
+                                </span>
+                              ))}
+                            </div>
+
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowPayForm(false)}>Cancel</button>
+                              <button type="submit" disabled={savingPay} className="btn btn-primary btn-sm">
+                                {savingPay ? 'Saving…' : editPayLog ? 'Update' : 'Save'}
+                              </button>
+                            </div>
+                          </form>
+                        )}
+
+                        {/* Log entries */}
+                        {payLogs.length === 0 ? (
+                          <p style={{ fontSize: '0.8rem', color: 'var(--navy-400)' }}>No payments logged yet.</p>
+                        ) : payLogs.map((log, i) => (
+                          <div key={log._id} style={{
+                            display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8,
+                            padding: '0.4rem 0', borderBottom: i < payLogs.length - 1 ? '1px solid var(--navy-50)' : 'none',
+                          }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#15803d' }}>+{fmt(log.amount)}</span>
+                                <span style={{ fontSize: '0.7rem', color: 'var(--navy-400)' }}>{new Date(log.date).toLocaleDateString()}</span>
+                                {log.wallet && (
+                                  <span style={{ fontSize: '0.65rem', fontWeight: 600, background: 'rgba(79,70,229,0.1)', color: 'var(--accent-600)', padding: '1px 6px', borderRadius: 4, border: '1px solid rgba(79,70,229,0.2)' }}>
+                                    {log.wallet.name}
+                                  </span>
+                                )}
+                                {log.screenshots.length > 0 && (
+                                  <span style={{ fontSize: '0.68rem', color: 'var(--navy-400)', display: 'flex', alignItems: 'center', gap: 2 }}>
+                                    <PhotoIcon style={{ width: 10, height: 10 }} />{log.screenshots.length}
+                                  </span>
+                                )}
+                              </div>
+                              {log.note && <div style={{ fontSize: '0.72rem', color: 'var(--navy-600)', marginTop: 1 }}>{log.note}</div>}
+                              {log.loggedBy && <div style={{ fontSize: '0.68rem', color: 'var(--navy-400)' }}>by {log.loggedBy.firstName} {log.loggedBy.lastName}</div>}
+                            </div>
+                            <div style={{ display: 'flex', gap: 3, flexShrink: 0 }}>
+                              <button className="btn btn-ghost btn-sm" title="Edit" onClick={() => openPayForm(log)}>
+                                <PencilIcon style={{ width: 11, height: 11 }} />
+                              </button>
+                              <button className="btn btn-ghost btn-sm" title="Delete" style={{ color: '#dc2626' }} onClick={() => deletePayLog(log._id)}>
+                                <TrashIcon style={{ width: 11, height: 11 }} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                    </div>
+                  )
+                )}
+
+                {/* ── RATE TIERS TAB ── */}
+                {activeTab === 'tiers' && selectedUser && (
+                  loadingTiers ? (
+                    <div style={{ display: 'flex', justifyContent: 'center', padding: '2rem' }}><div className="spinner" /></div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <p style={{ fontSize: '0.75rem', color: 'var(--navy-400)', margin: '0 0 0.25rem' }}>
+                        Expand a carrier to enable vendors and configure per-weight rate tiers. Rates here are what the user is charged.
+                      </p>
+
+                      {CARRIERS_ORDER.map(carrier => {
+                        const allVendors    = access.filter(v => v.carrier === carrier);
+                        const apiVendors      = allVendors.filter(v => v.vendorType !== 'manifest');
+                        const manifestVendors = allVendors.filter(v => v.vendorType === 'manifest');
+                        const enabledCount  = allVendors.filter(v => v.isAllowed).length;
+                        const isCarrierOpen = expandedCarriers[carrier] || false;
+                        const cfg = CARRIER_BG[carrier] || { border: 'var(--navy-200)', headerBg: 'var(--navy-50)' };
+                        const isAddingHere = addingForCarrier === carrier;
+
+                        // ── Reusable vendor row renderer ─────────────
+                        const renderVendorRow = (vendor: VendorAccess, vi: number, isFirst: boolean) => (
+                          <div key={vendor.vendorId} style={{ borderTop: `1px solid ${isFirst ? cfg.border : 'var(--navy-75)'}` }}>
+                            <div
+                              onClick={() => vendor.isAllowed && setExpandedV(e => ({ ...e, [vendor.vendorId]: !e[vendor.vendorId] }))}
+                              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.45rem 0.875rem 0.45rem 1rem', background: vendor.isAllowed ? 'var(--success-50)' : 'transparent', cursor: vendor.isAllowed ? 'pointer' : 'default' }}
+                            >
+                              <input type="checkbox" checked={vendor.isAllowed} onClick={e => e.stopPropagation()}
+                                onChange={() => setAccess(a => a.map(v => v.vendorId === vendor.vendorId ? { ...v, isAllowed: !v.isAllowed } : v))}
+                                style={{ cursor: 'pointer', flexShrink: 0 }}
+                              />
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                {/* Manifest vendor: show inline edit or name */}
+                                {vendor.vendorType === 'manifest' && editingVendorId === vendor.vendorId ? (
+                                  <div style={{ display: 'flex', gap: 4 }} onClick={e => e.stopPropagation()}>
+                                    <input
+                                      autoFocus
+                                      type="text" className="form-input"
+                                      style={{ padding: '0.2rem 0.4rem', fontSize: '0.78rem', width: 140 }}
+                                      value={editingVendorName}
+                                      onChange={e => setEditingVendorName(e.target.value)}
+                                      onKeyDown={e => { if (e.key === 'Enter') saveManifestVendorName(vendor.vendorId); if (e.key === 'Escape') setEditingVendorId(''); }}
+                                    />
+                                    <button className="btn btn-primary btn-sm" style={{ padding: '2px 6px', fontSize: '0.7rem' }} onClick={() => saveManifestVendorName(vendor.vendorId)}>Save</button>
+                                    <button className="btn btn-ghost btn-sm" style={{ padding: '2px 6px', fontSize: '0.7rem' }} onClick={() => setEditingVendorId('')}>✕</button>
+                                  </div>
+                                ) : (
+                                  <span style={{ fontWeight: 600, fontSize: '0.79rem', color: 'var(--navy-900)' }}>{vendor.vendorName}</span>
+                                )}
+                                {vendor.shippingService && editingVendorId !== vendor.vendorId && (
+                                  <span style={{ marginLeft: 5, fontSize: '0.68rem', color: 'var(--navy-500)' }}>{vendor.shippingService}</span>
+                                )}
+                              </div>
+                              <span style={{ fontSize: '0.68rem', color: 'var(--navy-500)', flexShrink: 0 }}>base {fmt(vendor.baseRate)}</span>
+                              {/* Edit / delete for manifest vendors */}
+                              {vendor.vendorType === 'manifest' && editingVendorId !== vendor.vendorId && (
+                                <>
+                                  <button title="Rename" onClick={e => { e.stopPropagation(); setEditingVendorId(vendor.vendorId); setEditingVendorName(vendor.vendorName); }}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--navy-400)', padding: 2 }}>
+                                    <PencilIcon style={{ width: 11, height: 11 }} />
+                                  </button>
+                                  <button title="Delete" onClick={e => { e.stopPropagation(); deleteManifestVendor(vendor.vendorId, vendor.vendorName); }}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger-400)', padding: 2 }}>
+                                    <TrashIcon style={{ width: 11, height: 11 }} />
+                                  </button>
+                                </>
+                              )}
+                              {vendor.isAllowed && editingVendorId !== vendor.vendorId && <>
+                                <span style={{ fontSize: '0.62rem', padding: '1px 5px', borderRadius: 8, background: vendor.rateTiers.length > 0 ? 'var(--accent-100)' : 'var(--navy-100)', color: vendor.rateTiers.length > 0 ? 'var(--accent-700)' : 'var(--navy-500)', flexShrink: 0 }}>
+                                  {vendor.rateTiers.length}t
+                                </span>
+                                {expandedV[vendor.vendorId]
+                                  ? <ChevronUpIcon style={{ width: 12, height: 12, color: 'var(--navy-400)', flexShrink: 0 }} />
+                                  : <ChevronDownIcon style={{ width: 12, height: 12, color: 'var(--navy-400)', flexShrink: 0 }} />
+                                }
+                              </>}
+                            </div>
+
+                            {/* Tier editor */}
+                            {expandedV[vendor.vendorId] && vendor.isAllowed && (
+                              <div style={{ padding: '0.5rem 0.875rem 0.625rem 1.875rem', borderTop: '1px dashed var(--navy-100)', background: 'var(--navy-25)' }}>
+                                {vendor.rateTiers.length === 0 ? (
+                                  <p style={{ fontSize: '0.72rem', color: 'var(--navy-400)', fontStyle: 'italic', marginBottom: '0.375rem' }}>
+                                    No tiers — using base rate {fmt(vendor.baseRate)} for all weights.
+                                  </p>
+                                ) : (
+                                  <div style={{ marginBottom: '0.375rem' }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '76px 76px 76px 24px', gap: 3, marginBottom: 3 }}>
+                                      {['Min lbs', 'Max lbs', 'Rate ($)', ''].map((h, i) => (
+                                        <div key={i} style={{ fontSize: '0.6rem', fontWeight: 700, color: 'var(--navy-400)', textTransform: 'uppercase' }}>{h}</div>
+                                      ))}
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                                      {vendor.rateTiers.map((tier, ti) => (
+                                        <div key={ti} style={{ display: 'grid', gridTemplateColumns: '76px 76px 76px 24px', gap: 3, alignItems: 'center' }}>
+                                          <input type="number" min="0" className="form-input" style={{ padding: '0.25rem 0.35rem', fontSize: '0.76rem' }} value={tier.minLbs} onChange={e => updateTierField(vendor.vendorId, ti, 'minLbs', parseFloat(e.target.value) || 0)} />
+                                          <input type="number" min="0" className="form-input" style={{ padding: '0.25rem 0.35rem', fontSize: '0.76rem' }} value={tier.maxLbs ?? ''} placeholder="∞" onChange={e => updateTierField(vendor.vendorId, ti, 'maxLbs', e.target.value ? parseFloat(e.target.value) : null)} />
+                                          <input type="number" step="0.01" min="0" className="form-input" style={{ padding: '0.25rem 0.35rem', fontSize: '0.76rem' }} value={tier.rate} onChange={e => updateTierField(vendor.vendorId, ti, 'rate', parseFloat(e.target.value) || 0)} />
+                                          <button onClick={() => setAccess(a => a.map(v => v.vendorId !== vendor.vendorId ? v : { ...v, rateTiers: v.rateTiers.filter((_, i) => i !== ti) }))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger-500)', padding: 1 }}>
+                                            <XMarkIcon style={{ width: 12, height: 12 }} />
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                                <button onClick={() => setAccess(a => a.map(v => v.vendorId !== vendor.vendorId ? v : { ...v, rateTiers: [...v.rateTiers, { minLbs: 0, maxLbs: null, rate: v.baseRate }] }))} className="btn btn-ghost btn-sm" style={{ fontSize: '0.7rem', padding: '2px 7px' }}>
+                                  <PlusIcon style={{ width: 10, height: 10 }} /> Add Tier
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        );
+
+                        return (
+                          <div key={carrier} style={{ border: `1.5px solid ${cfg.border}`, borderRadius: 10, overflow: 'hidden' }}>
+
+                            {/* Carrier header */}
+                            <div
+                              onClick={() => setExpandedCarriers(e => ({ ...e, [carrier]: !e[carrier] }))}
+                              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.6rem 0.875rem', background: cfg.headerBg, cursor: 'pointer', userSelect: 'none' }}
+                            >
+                              <CarrierBadge carrier={carrier} />
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--navy-900)' }}>{carrier}</div>
+                                <div style={{ fontSize: '0.68rem', color: 'var(--navy-500)' }}>
+                                  {allVendors.length === 0
+                                    ? 'No vendors configured'
+                                    : `${apiVendors.length} API · ${manifestVendors.length} Manifest · ${enabledCount} enabled`
+                                  }
+                                </div>
+                              </div>
+                              {allVendors.length > 0 && (
+                                <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
+                                  {allVendors.slice(0, 4).map(v => (
+                                    <span key={v.vendorId} title={v.vendorName} style={{ width: 7, height: 7, borderRadius: '50%', background: v.isAllowed ? 'var(--success-500)' : 'var(--navy-200)', display: 'inline-block' }} />
+                                  ))}
+                                  {allVendors.length > 4 && <span style={{ fontSize: '0.62rem', color: 'var(--navy-400)' }}>+{allVendors.length - 4}</span>}
+                                </div>
+                              )}
+                              {isCarrierOpen
+                                ? <ChevronUpIcon style={{ width: 14, height: 14, color: 'var(--navy-400)', flexShrink: 0 }} />
+                                : <ChevronDownIcon style={{ width: 14, height: 14, color: 'var(--navy-400)', flexShrink: 0 }} />
+                              }
+                            </div>
+
+                            {/* Expanded body */}
+                            {isCarrierOpen && (
+                              <div style={{ background: '#fff' }}>
+
+                                {/* ── API Vendors sub-section ── */}
+                                {apiVendors.length > 0 && (
+                                  <>
+                                    <div style={{ padding: '0.35rem 0.875rem', background: 'var(--navy-50)', borderTop: `1px solid ${cfg.border}`, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                      <span style={{ fontSize: '0.6rem', fontWeight: 700, color: 'var(--navy-500)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>API Vendors</span>
+                                    </div>
+                                    {apiVendors.map((vendor, vi) => renderVendorRow(vendor, vi, vi === 0))}
+                                  </>
+                                )}
+
+                                {/* ── Manifest Vendors sub-section ── */}
+                                <div style={{ padding: '0.35rem 0.875rem', background: 'var(--navy-50)', borderTop: `1px solid ${cfg.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                                  <span style={{ fontSize: '0.6rem', fontWeight: 700, color: 'var(--navy-500)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Manifest Vendors</span>
+                                  {!isAddingHere && (
+                                    <button
+                                      className="btn btn-ghost btn-sm"
+                                      style={{ fontSize: '0.65rem', padding: '1px 7px' }}
+                                      onClick={() => { setAddingForCarrier(carrier); setNewVendorName(''); }}
+                                    >
+                                      <PlusIcon style={{ width: 9, height: 9 }} /> Add
+                                    </button>
+                                  )}
+                                </div>
+
+                                {/* Inline add form */}
+                                {isAddingHere && (
+                                  <div style={{ padding: '0.5rem 0.875rem', borderTop: '1px dashed var(--navy-100)', background: 'var(--accent-50)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <input
+                                      autoFocus
+                                      type="text" className="form-input"
+                                      style={{ padding: '0.3rem 0.5rem', fontSize: '0.78rem', flex: 1 }}
+                                      placeholder={`e.g. USPS Veeqo Manifested`}
+                                      value={newVendorName}
+                                      onChange={e => setNewVendorName(e.target.value)}
+                                      onKeyDown={e => { if (e.key === 'Enter') addManifestVendor(carrier); if (e.key === 'Escape') setAddingForCarrier(''); }}
+                                    />
+                                    <button className="btn btn-primary btn-sm" style={{ fontSize: '0.72rem', padding: '0.3rem 0.625rem' }}
+                                      onClick={() => addManifestVendor(carrier)} disabled={savingVendor || !newVendorName.trim()}>
+                                      {savingVendor ? '…' : 'Add'}
+                                    </button>
+                                    <button className="btn btn-ghost btn-sm" style={{ fontSize: '0.72rem', padding: '0.3rem 0.5rem' }}
+                                      onClick={() => setAddingForCarrier('')}>Cancel</button>
+                                  </div>
+                                )}
+
+                                {manifestVendors.length === 0 && !isAddingHere ? (
+                                  <div style={{ padding: '0.6rem 1rem', fontSize: '0.72rem', color: 'var(--navy-400)', fontStyle: 'italic' }}>
+                                    No manifest vendors yet — click Add to create one.
+                                  </div>
+                                ) : (
+                                  manifestVendors.map((vendor, vi) => renderVendorRow(vendor, vi, vi === 0))
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 4 }}>
+                        <button className="btn btn-primary btn-sm" onClick={saveTiers} disabled={savingTiers}>
+                          {savingTiers ? 'Saving…' : 'Save Rate Tiers'}
+                        </button>
+                      </div>
+                    </div>
+                  )
+                )}
+
+              </div>
+            </>
+          )}
+        </div>
       </div>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
-          <div className="flex-1 flex justify-between sm:hidden">
-            <button
-              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-              disabled={currentPage === 1}
-              className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Previous
-            </button>
-            <button
-              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-              disabled={currentPage === totalPages}
-              className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Next
-            </button>
-          </div>
-          <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-            <div>
-              <p className="text-sm text-gray-700">
-                Page <span className="font-medium">{currentPage}</span> of{' '}
-                <span className="font-medium">{totalPages}</span>
-              </p>
-            </div>
-            <div>
-              <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
-                <button
-                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                  disabled={currentPage === 1}
-                  className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Previous
-                </button>
-                <button
-                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                  disabled={currentPage === totalPages}
-                  className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Next
-                </button>
-              </nav>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Create User Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-            <div className="mt-3">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Create New User</h3>
-              <form onSubmit={handleCreateUser} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      First Name
-                    </label>
-                    <input
-                      type="text"
-                      value={userForm.firstName}
-                      onChange={(e) => setUserForm({ ...userForm, firstName: e.target.value })}
-                      className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Last Name
-                    </label>
-                    <input
-                      type="text"
-                      value={userForm.lastName}
-                      onChange={(e) => setUserForm({ ...userForm, lastName: e.target.value })}
-                      className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Email Address
-                  </label>
-                  <input
-                    type="email"
-                    value={userForm.email}
-                    onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
-                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Password
-                  </label>
-                  <input
-                    type="password"
-                    value={userForm.password}
-                    onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
-                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                    required
-                    minLength={6}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Role
-                  </label>
-                  <select
-                    value={userForm.role}
-                    onChange={(e) => setUserForm({ ...userForm, role: e.target.value as 'admin' | 'reseller' | 'user' })}
-                    className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md"
-                  >
-                    <option value="user">User</option>
-                    <option value="reseller">Reseller</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                </div>
-
-                <div className="flex justify-end space-x-3">
-                  <button
-                    type="button"
-                    onClick={() => setShowCreateModal(false)}
-                    className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isSubmitting ? 'Creating...' : 'Create User'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Edit User Modal */}
-      {showEditModal && selectedUser && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-            <div className="mt-3">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Edit User</h3>
-              <form onSubmit={handleEditUser} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      First Name
-                    </label>
-                    <input
-                      type="text"
-                      value={userForm.firstName}
-                      onChange={(e) => setUserForm({ ...userForm, firstName: e.target.value })}
-                      className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Last Name
-                    </label>
-                    <input
-                      type="text"
-                      value={userForm.lastName}
-                      onChange={(e) => setUserForm({ ...userForm, lastName: e.target.value })}
-                      className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Email Address
-                  </label>
-                  <input
-                    type="email"
-                    value={userForm.email}
-                    onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
-                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Role
-                  </label>
-                  <select
-                    value={userForm.role}
-                    onChange={(e) => setUserForm({ ...userForm, role: e.target.value as 'admin' | 'reseller' | 'user' })}
-                    className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md"
-                  >
-                    <option value="user">User</option>
-                    <option value="reseller">Reseller</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                </div>
-
-                <div className="flex justify-end space-x-3">
-                  <button
-                    type="button"
-                    onClick={() => setShowEditModal(false)}
-                    className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isSubmitting ? 'Updating...' : 'Update User'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

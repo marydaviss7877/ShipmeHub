@@ -1,0 +1,98 @@
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
+
+const vendorSchema = new mongoose.Schema({
+  // Display name e.g. "USPS Ground via EasyPost"
+  name: {
+    type: String,
+    required: true,
+    trim: true
+  },
+
+  // Carrier brand
+  carrier: {
+    type: String,
+    enum: ['USPS', 'UPS', 'FedEx', 'DHL'],
+    required: true
+  },
+
+  // ShippersHub references (only for USPS via ShippersHub)
+  shippershubCarrierId: { type: String, default: null },
+  shippershubVendorId:  { type: String, default: null },
+
+  // Service type e.g. "ground", "priority", "express"
+  shippingService: { type: String, default: '' },
+
+  // Rate per label (admin controlled)
+  rate: {
+    type: Number,
+    required: true,
+    min: 0,
+    default: 0
+  },
+
+  // Optional rate range for display (e.g. $0.45 – $1.20)
+  rateMin: { type: Number, default: null },
+  rateMax: { type: Number, default: null },
+
+  // Which roles can see this vendor
+  visibleToRoles: {
+    type: [String],
+    enum: ['admin', 'reseller', 'user'],
+    default: ['admin', 'reseller', 'user']
+  },
+
+  // Specific users who can see this vendor (empty = all users of allowed roles)
+  visibleToUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+
+  isActive: { type: Boolean, default: true },
+
+  description: { type: String, default: '' },
+
+  // Source: 'shippershub' | 'manual'
+  source: {
+    type: String,
+    enum: ['shippershub', 'manual'],
+    default: 'shippershub'
+  },
+
+  // Vendor type: 'api' = non-manifest API label generation | 'manifest' = manual manifest pricing entry
+  vendorType: {
+    type: String,
+    enum: ['api', 'manifest'],
+    default: 'api'
+  },
+
+  // ── Vendor Portal Credentials ─────────────────────────────
+  // Vendors log into a separate neutral portal (no ShipmeHub branding)
+  vendorPortalEmail:    { type: String, unique: true, sparse: true, lowercase: true, trim: true },
+  vendorPortalPassword: { type: String, select: false },
+  vendorPortalIsActive: { type: Boolean, default: false },
+
+  // Contact email for job notifications (can differ from portal login)
+  vendorContactEmail: { type: String, default: '' },
+
+  // ── Vendor Finance ────────────────────────────────────────
+  // Per-label rate ShipmeHub owes this vendor for manifested jobs
+  vendorRate:      { type: Number, default: 0, min: 0 },
+  // Running payable balance (added when admin approves a job)
+  dueBalance:      { type: Number, default: 0 },
+  // Lifetime total credited to vendor
+  totalEarnings:   { type: Number, default: 0 },
+
+}, {
+  timestamps: true
+});
+
+// Hash vendor portal password before saving
+vendorSchema.pre('save', async function () {
+  if (!this.isModified('vendorPortalPassword') || !this.vendorPortalPassword) return;
+  const salt = await bcrypt.genSalt(12);
+  this.vendorPortalPassword = await bcrypt.hash(this.vendorPortalPassword, salt);
+});
+
+vendorSchema.methods.comparePortalPassword = async function (candidate) {
+  return bcrypt.compare(candidate, this.vendorPortalPassword);
+};
+
+module.exports = mongoose.model('Vendor', vendorSchema);

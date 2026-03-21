@@ -40,7 +40,7 @@ interface RegisterData {
 }
 
 // Action types
-type AuthAction = 
+type AuthAction =
   | { type: 'AUTH_START' }
   | { type: 'AUTH_SUCCESS'; payload: { user: User; token: string } }
   | { type: 'AUTH_FAILURE'; payload: string }
@@ -117,7 +117,7 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Axios configuration
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
 
 // Configure axios defaults
 axios.defaults.baseURL = API_URL;
@@ -137,10 +137,13 @@ axios.interceptors.request.use(
 );
 
 // Add response interceptor to handle token expiration
+// Exclude auth endpoints — a 401 on login/register is just wrong credentials, not a session expiry
 axios.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const url = error.config?.url || '';
+    const isAuthEndpoint = url.includes('/auth/login') || url.includes('/auth/register');
+    if (error.response?.status === 401 && !isAuthEndpoint) {
       localStorage.removeItem('token');
       window.location.href = '/login';
     }
@@ -186,13 +189,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       dispatch({ type: 'AUTH_START' });
       console.log('Attempting login with:', { email, password });
       console.log('API URL:', API_URL);
-      
+
       const response = await axios.post('/auth/login', { email, password });
       console.log('Login response:', response.data);
-      
+
       const { token, user } = response.data;
       localStorage.setItem('token', token);
-      
+
       dispatch({
         type: 'AUTH_SUCCESS',
         payload: { user, token },
@@ -210,10 +213,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       dispatch({ type: 'AUTH_START' });
       const response = await axios.post('/auth/register', userData);
-      
+
       const { token, user } = response.data;
       localStorage.setItem('token', token);
-      
+
       dispatch({
         type: 'AUTH_SUCCESS',
         payload: { user, token },

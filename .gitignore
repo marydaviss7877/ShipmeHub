@@ -68,3 +68,11 @@ Thumbs.db
 
 # Debug files
 debug.log
+
+# Temp files
+nul
+tmpclaude-*
+test.txt
+test-portal.js
+server/uploads/
+server/data/

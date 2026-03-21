@@ -1,0 +1,101 @@
+const nodemailer = require('nodemailer');
+
+const transporter = nodemailer.createTransport({
+  host:   process.env.EMAIL_HOST  || 'smtp.gmail.com',
+  port:   parseInt(process.env.EMAIL_PORT) || 587,
+  secure: false,
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
+
+const sendEmail = async ({ to, subject, html }) => {
+  try {
+    await transporter.sendMail({
+      from: `"Label Portal" <${process.env.EMAIL_USER}>`,
+      to,
+      subject,
+      html,
+    });
+    console.log(`📧 Email → ${to} | ${subject}`);
+    return true;
+  } catch (err) {
+    console.error('📧 Email error:', err.message);
+    return false;
+  }
+};
+
+// ── Templates ──────────────────────────────────────────────────────────────
+
+const vendorJobAssigned = (jobId, carrier, labelCount, portalUrl) => ({
+  subject: `New Label Request — ${carrier} (${labelCount} labels)`,
+  html: `
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#f8fafc;border-radius:8px;">
+      <h2 style="color:#1e293b;margin-bottom:8px;">New Label Generation Request</h2>
+      <p style="color:#475569;">A new request has been assigned to your account:</p>
+      <table style="width:100%;border-collapse:collapse;margin:16px 0;background:#fff;border-radius:6px;overflow:hidden;">
+        <tr style="background:#f1f5f9;"><td style="padding:10px 16px;font-weight:600;color:#334155;width:40%;">Carrier</td><td style="padding:10px 16px;color:#0f172a;">${carrier}</td></tr>
+        <tr><td style="padding:10px 16px;font-weight:600;color:#334155;">Labels</td><td style="padding:10px 16px;color:#0f172a;">${labelCount}</td></tr>
+        <tr style="background:#f1f5f9;"><td style="padding:10px 16px;font-weight:600;color:#334155;">Job ID</td><td style="padding:10px 16px;color:#0f172a;font-family:monospace;">${jobId}</td></tr>
+      </table>
+      <p style="color:#475569;">Please log in to your portal to accept and process this request within <strong>1 hour</strong> of acceptance.</p>
+      <a href="${portalUrl}" style="display:inline-block;background:#2563eb;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600;margin-top:8px;">View Request →</a>
+      <p style="margin-top:24px;color:#94a3b8;font-size:12px;">This is an automated notification. Do not reply to this email.</p>
+    </div>
+  `,
+});
+
+const vendorJobCancelled = (jobId, carrier, reason) => ({
+  subject: `Request Cancelled — ${carrier} Job ${jobId}`,
+  html: `
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#f8fafc;border-radius:8px;">
+      <h2 style="color:#dc2626;margin-bottom:8px;">Request Cancelled</h2>
+      <p style="color:#475569;">The following job has been cancelled and removed from your queue:</p>
+      <table style="width:100%;border-collapse:collapse;margin:16px 0;background:#fff;border-radius:6px;overflow:hidden;">
+        <tr style="background:#f1f5f9;"><td style="padding:10px 16px;font-weight:600;color:#334155;width:40%;">Job ID</td><td style="padding:10px 16px;color:#0f172a;font-family:monospace;">${jobId}</td></tr>
+        <tr><td style="padding:10px 16px;font-weight:600;color:#334155;">Carrier</td><td style="padding:10px 16px;color:#0f172a;">${carrier}</td></tr>
+        ${reason ? `<tr style="background:#f1f5f9;"><td style="padding:10px 16px;font-weight:600;color:#334155;">Reason</td><td style="padding:10px 16px;color:#0f172a;">${reason}</td></tr>` : ''}
+      </table>
+      <p style="color:#94a3b8;font-size:12px;">This is an automated notification.</p>
+    </div>
+  `,
+});
+
+const vendorUploadRejected = (jobId, carrier, reason) => ({
+  subject: `Upload Rejected — Please Re-upload (${carrier} Job ${jobId})`,
+  html: `
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#f8fafc;border-radius:8px;">
+      <h2 style="color:#d97706;margin-bottom:8px;">Upload Rejected</h2>
+      <p style="color:#475569;">Your uploaded file for the following job has been rejected:</p>
+      <table style="width:100%;border-collapse:collapse;margin:16px 0;background:#fff;border-radius:6px;overflow:hidden;">
+        <tr style="background:#f1f5f9;"><td style="padding:10px 16px;font-weight:600;color:#334155;width:40%;">Job ID</td><td style="padding:10px 16px;color:#0f172a;font-family:monospace;">${jobId}</td></tr>
+        <tr><td style="padding:10px 16px;font-weight:600;color:#334155;">Carrier</td><td style="padding:10px 16px;color:#0f172a;">${carrier}</td></tr>
+        ${reason ? `<tr style="background:#f1f5f9;"><td style="padding:10px 16px;font-weight:600;color:#334155;">Reason</td><td style="padding:10px 16px;color:#0f172a;">${reason}</td></tr>` : ''}
+      </table>
+      <p style="color:#475569;">Please review the issue and re-upload the corrected file via your portal.</p>
+      <p style="color:#94a3b8;font-size:12px;">This is an automated notification.</p>
+    </div>
+  `,
+});
+
+const userLabelsReady = (userName, jobId, carrier, labelCount, downloadUrl) => ({
+  subject: `Your ${carrier} Labels Are Ready — Download Now`,
+  html: `
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#f8fafc;border-radius:8px;">
+      <h2 style="color:#059669;margin-bottom:8px;">Your Labels Are Ready!</h2>
+      <p style="color:#475569;">Hello ${userName},</p>
+      <p style="color:#475569;">Your label generation request has been completed and approved:</p>
+      <table style="width:100%;border-collapse:collapse;margin:16px 0;background:#fff;border-radius:6px;overflow:hidden;">
+        <tr style="background:#f1f5f9;"><td style="padding:10px 16px;font-weight:600;color:#334155;width:40%;">Carrier</td><td style="padding:10px 16px;color:#0f172a;">${carrier}</td></tr>
+        <tr><td style="padding:10px 16px;font-weight:600;color:#334155;">Labels</td><td style="padding:10px 16px;color:#0f172a;">${labelCount}</td></tr>
+        <tr style="background:#f1f5f9;"><td style="padding:10px 16px;font-weight:600;color:#334155;">Job ID</td><td style="padding:10px 16px;color:#0f172a;font-family:monospace;">${jobId}</td></tr>
+      </table>
+      <p style="color:#475569;">Please download your labels and ship within the required timeframe.</p>
+      <a href="${downloadUrl}" style="display:inline-block;background:#059669;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600;margin-top:8px;">Download Labels →</a>
+      <p style="margin-top:24px;color:#94a3b8;font-size:12px;">ShipmeHub Label Portal</p>
+    </div>
+  `,
+});
+
+module.exports = { sendEmail, vendorJobAssigned, vendorJobCancelled, vendorUploadRejected, userLabelsReady };

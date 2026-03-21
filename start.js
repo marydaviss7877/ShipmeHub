@@ -44,6 +44,6 @@ frontend.on('error', (err) => {
 });
 
 console.log('✅ Both servers are starting...');
-console.log('🌐 Backend: http://localhost:5000');
+console.log('🌐 Backend: http://localhost:5001');
 console.log('🌐 Frontend: http://localhost:3000');
 console.log('\nPress Ctrl+C to stop both servers');

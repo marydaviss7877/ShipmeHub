@@ -1,373 +1,200 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
-import { KeyIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
+import { KeyIcon, EyeIcon, EyeSlashIcon, UserCircleIcon, CheckCircleIcon, ExclamationCircleIcon } from '@heroicons/react/24/outline';
 
 const Profile: React.FC = () => {
   const { user, updateUser } = useAuth();
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing,          setIsEditing]          = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
-  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
-  const [showNewPassword, setShowNewPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
+  const [showCurrentPw,      setShowCurrentPw]      = useState(false);
+  const [showNewPw,          setShowNewPw]           = useState(false);
+  const [showConfirmPw,      setShowConfirmPw]       = useState(false);
+  const [isLoading,          setIsLoading]           = useState(false);
+  const [message,            setMessage]             = useState('');
+  const [error,              setError]               = useState('');
 
   const [profileData, setProfileData] = useState({
     firstName: user?.firstName || '',
-    lastName: user?.lastName || '',
-    email: user?.email || '',
+    lastName:  user?.lastName  || '',
+    email:     user?.email     || '',
   });
 
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
-    newPassword: '',
+    newPassword:     '',
     confirmPassword: '',
   });
 
-  const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setProfileData({
-      ...profileData,
-      [e.target.name]: e.target.value,
-    });
-  };
-
-  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setPasswordData({
-      ...passwordData,
-      [e.target.name]: e.target.value,
-    });
-  };
-
   const handleProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-    setError('');
-    setMessage('');
-
+    setIsLoading(true); setError(''); setMessage('');
     try {
-      const response = await axios.put(`/users/${user?.id}`, profileData);
-      updateUser(response.data.user);
+      const res = await axios.put(`/users/${user?.id}`, profileData);
+      updateUser(res.data.user);
       setMessage('Profile updated successfully');
       setIsEditing(false);
-    } catch (error: any) {
-      setError(error.response?.data?.message || 'Failed to update profile');
-    } finally {
-      setIsLoading(false);
-    }
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to update profile');
+    } finally { setIsLoading(false); }
   };
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (passwordData.newPassword !== passwordData.confirmPassword) {
-      setError('New passwords do not match');
-      return;
-    }
-
-    setIsLoading(true);
-    setError('');
-    setMessage('');
-
+    if (passwordData.newPassword !== passwordData.confirmPassword) { setError('New passwords do not match'); return; }
+    setIsLoading(true); setError(''); setMessage('');
     try {
-      await axios.put(`/users/${user?.id}/password`, {
-        currentPassword: passwordData.currentPassword,
-        newPassword: passwordData.newPassword,
-      });
+      await axios.put(`/users/${user?.id}/password`, { currentPassword: passwordData.currentPassword, newPassword: passwordData.newPassword });
       setMessage('Password updated successfully');
-      setPasswordData({
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: '',
-      });
+      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
       setIsChangingPassword(false);
-    } catch (error: any) {
-      setError(error.response?.data?.message || 'Failed to update password');
-    } finally {
-      setIsLoading(false);
-    }
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to update password');
+    } finally { setIsLoading(false); }
   };
 
+  const initials = `${user?.firstName?.charAt(0) ?? ''}${user?.lastName?.charAt(0) ?? ''}`;
+
+  const roleBadgeClass = user?.role === 'admin' ? 'badge badge-red' : user?.role === 'reseller' ? 'badge badge-blue' : 'badge badge-gray';
+
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      {/* Profile Information */}
-      <div className="bg-white shadow rounded-lg">
-        <div className="px-4 py-5 sm:p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg leading-6 font-medium text-gray-900">
-              Profile Information
-            </h3>
-            {!isEditing && (
-              <button
-                onClick={() => setIsEditing(true)}
-                className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-primary-700 bg-primary-100 hover:bg-primary-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-              >
-                Edit Profile
-              </button>
-            )}
+    <div style={{ maxWidth: 680, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }} className="animate-fadeIn">
+
+      <div className="page-header">
+        <h1 className="page-title">Profile</h1>
+        <p className="page-subtitle">Manage your personal information and password.</p>
+      </div>
+
+      {/* Profile info card */}
+      <div className="sh-card">
+        <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--navy-100)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <h2 style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--navy-900)' }}>Profile Information</h2>
+          {!isEditing && (
+            <button onClick={() => setIsEditing(true)} className="btn btn-ghost btn-sm">Edit Profile</button>
+          )}
+        </div>
+
+        <div style={{ padding: '1.5rem' }}>
+          {/* Avatar row */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: '1.5rem' }}>
+            <div className="avatar avatar-lg avatar-indigo">{initials}</div>
+            <div>
+              <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--navy-900)' }}>{user?.firstName} {user?.lastName}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                <span className={roleBadgeClass}>{user?.role}</span>
+                <span style={{ fontSize: '0.8rem', color: 'var(--navy-500)' }}>{user?.email}</span>
+              </div>
+            </div>
           </div>
 
           {message && (
-            <div className="mb-4 rounded-md bg-green-50 p-4">
-              <div className="text-sm text-green-700">{message}</div>
+            <div className="alert alert-success" style={{ marginBottom: '1.25rem' }}>
+              <CheckCircleIcon style={{ width: 18, height: 18, flexShrink: 0 }} />
+              <span>{message}</span>
             </div>
           )}
-
           {error && (
-            <div className="mb-4 rounded-md bg-red-50 p-4">
-              <div className="text-sm text-red-700">{error}</div>
+            <div className="alert alert-danger" style={{ marginBottom: '1.25rem' }}>
+              <ExclamationCircleIcon style={{ width: 18, height: 18, flexShrink: 0 }} />
+              <span>{error}</span>
             </div>
           )}
 
           {isEditing ? (
-            <form onSubmit={handleProfileSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <form onSubmit={handleProfileSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
-                  <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">
-                    First Name
-                  </label>
-                  <input
-                    type="text"
-                    name="firstName"
-                    id="firstName"
-                    value={profileData.firstName}
-                    onChange={handleProfileChange}
-                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                    required
-                  />
+                  <label className="form-label">First Name</label>
+                  <input name="firstName" type="text" required className="form-input" value={profileData.firstName} onChange={e => setProfileData({ ...profileData, firstName: e.target.value })} />
                 </div>
                 <div>
-                  <label htmlFor="lastName" className="block text-sm font-medium text-gray-700">
-                    Last Name
-                  </label>
-                  <input
-                    type="text"
-                    name="lastName"
-                    id="lastName"
-                    value={profileData.lastName}
-                    onChange={handleProfileChange}
-                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                    required
-                  />
+                  <label className="form-label">Last Name</label>
+                  <input name="lastName" type="text" required className="form-input" value={profileData.lastName} onChange={e => setProfileData({ ...profileData, lastName: e.target.value })} />
                 </div>
               </div>
-
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                  Email Address
-                </label>
-                <input
-                  type="email"
-                  name="email"
-                  id="email"
-                  value={profileData.email}
-                  onChange={handleProfileChange}
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                  required
-                />
+                <label className="form-label">Email Address</label>
+                <input name="email" type="email" required className="form-input" value={profileData.email} onChange={e => setProfileData({ ...profileData, email: e.target.value })} />
               </div>
-
-              <div className="flex justify-end space-x-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsEditing(false);
-                    setProfileData({
-                      firstName: user?.firstName || '',
-                      lastName: user?.lastName || '',
-                      email: user?.email || '',
-                    });
-                    setError('');
-                    setMessage('');
-                  }}
-                  className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-                >
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
+                <button type="button" className="btn btn-ghost" onClick={() => { setIsEditing(false); setError(''); setMessage(''); setProfileData({ firstName: user?.firstName || '', lastName: user?.lastName || '', email: user?.email || '' }); }}>
                   Cancel
                 </button>
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
+                <button type="submit" disabled={isLoading} className="btn btn-primary">
                   {isLoading ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
             </form>
           ) : (
-            <dl className="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
-              <div>
-                <dt className="text-sm font-medium text-gray-500">First Name</dt>
-                <dd className="mt-1 text-sm text-gray-900">{user?.firstName}</dd>
-              </div>
-              <div>
-                <dt className="text-sm font-medium text-gray-500">Last Name</dt>
-                <dd className="mt-1 text-sm text-gray-900">{user?.lastName}</dd>
-              </div>
-              <div>
-                <dt className="text-sm font-medium text-gray-500">Email Address</dt>
-                <dd className="mt-1 text-sm text-gray-900">{user?.email}</dd>
-              </div>
-              <div>
-                <dt className="text-sm font-medium text-gray-500">Role</dt>
-                <dd className="mt-1 text-sm text-gray-900 capitalize">{user?.role}</dd>
-              </div>
-              <div>
-                <dt className="text-sm font-medium text-gray-500">Member Since</dt>
-                <dd className="mt-1 text-sm text-gray-900">
-                  {user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-sm font-medium text-gray-500">Last Login</dt>
-                <dd className="mt-1 text-sm text-gray-900">
-                  {user?.lastLogin ? new Date(user.lastLogin).toLocaleString() : 'Never'}
-                </dd>
-              </div>
-            </dl>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              {[
+                { label: 'First Name',    value: user?.firstName },
+                { label: 'Last Name',     value: user?.lastName },
+                { label: 'Email Address', value: user?.email },
+                { label: 'Role',          value: user?.role, capitalize: true },
+                { label: 'Member Since',  value: user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A' },
+                { label: 'Last Login',    value: user?.lastLogin  ? new Date(user.lastLogin).toLocaleString()  : 'Never' },
+              ].map(({ label, value, capitalize }) => (
+                <div key={label}>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--navy-400)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 4 }}>{label}</div>
+                  <div style={{ fontSize: '0.875rem', color: 'var(--navy-900)', fontWeight: 500, textTransform: capitalize ? 'capitalize' : undefined }}>{value}</div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </div>
 
-      {/* Change Password */}
-      <div className="bg-white shadow rounded-lg">
-        <div className="px-4 py-5 sm:p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg leading-6 font-medium text-gray-900">
-              Change Password
-            </h3>
-            {!isChangingPassword && (
-              <button
-                onClick={() => setIsChangingPassword(true)}
-                className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-primary-700 bg-primary-100 hover:bg-primary-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-              >
-                <KeyIcon className="h-4 w-4 mr-2" />
-                Change Password
-              </button>
-            )}
-          </div>
+      {/* Change Password card */}
+      <div className="sh-card">
+        <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--navy-100)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <h2 style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--navy-900)' }}>Change Password</h2>
+          {!isChangingPassword && (
+            <button onClick={() => setIsChangingPassword(true)} className="btn btn-ghost btn-sm">
+              <KeyIcon style={{ width: 15, height: 15 }} /> Change Password
+            </button>
+          )}
+        </div>
 
+        <div style={{ padding: '1.5rem' }}>
           {isChangingPassword ? (
-            <form onSubmit={handlePasswordSubmit} className="space-y-4">
-              <div>
-                <label htmlFor="currentPassword" className="block text-sm font-medium text-gray-700">
-                  Current Password
-                </label>
-                <div className="mt-1 relative">
-                  <input
-                    type={showCurrentPassword ? 'text' : 'password'}
-                    name="currentPassword"
-                    id="currentPassword"
-                    value={passwordData.currentPassword}
-                    onChange={handlePasswordChange}
-                    className="block w-full pr-10 border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                    required
-                  />
-                  <button
-                    type="button"
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                    onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                  >
-                    {showCurrentPassword ? (
-                      <EyeSlashIcon className="h-5 w-5 text-gray-400" />
-                    ) : (
-                      <EyeIcon className="h-5 w-5 text-gray-400" />
-                    )}
-                  </button>
+            <form onSubmit={handlePasswordSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {[
+                { id: 'currentPassword', label: 'Current Password', show: showCurrentPw, toggle: () => setShowCurrentPw(!showCurrentPw) },
+                { id: 'newPassword',     label: 'New Password',     show: showNewPw,     toggle: () => setShowNewPw(!showNewPw) },
+                { id: 'confirmPassword', label: 'Confirm Password', show: showConfirmPw, toggle: () => setShowConfirmPw(!showConfirmPw) },
+              ].map(({ id, label, show, toggle }) => (
+                <div key={id}>
+                  <label className="form-label">{label}</label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      id={id} name={id} type={show ? 'text' : 'password'} required minLength={6}
+                      className="form-input" style={{ paddingRight: '2.75rem' }}
+                      value={(passwordData as any)[id]}
+                      onChange={e => setPasswordData({ ...passwordData, [id]: e.target.value })}
+                    />
+                    <button type="button" onClick={toggle} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--navy-400)', padding: 0, display: 'flex' }}>
+                      {show ? <EyeSlashIcon style={{ width: 17, height: 17 }} /> : <EyeIcon style={{ width: 17, height: 17 }} />}
+                    </button>
+                  </div>
                 </div>
-              </div>
+              ))}
 
-              <div>
-                <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700">
-                  New Password
-                </label>
-                <div className="mt-1 relative">
-                  <input
-                    type={showNewPassword ? 'text' : 'password'}
-                    name="newPassword"
-                    id="newPassword"
-                    value={passwordData.newPassword}
-                    onChange={handlePasswordChange}
-                    className="block w-full pr-10 border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                    required
-                    minLength={6}
-                  />
-                  <button
-                    type="button"
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                    onClick={() => setShowNewPassword(!showNewPassword)}
-                  >
-                    {showNewPassword ? (
-                      <EyeSlashIcon className="h-5 w-5 text-gray-400" />
-                    ) : (
-                      <EyeIcon className="h-5 w-5 text-gray-400" />
-                    )}
-                  </button>
-                </div>
-              </div>
+              {passwordData.newPassword && passwordData.confirmPassword && passwordData.newPassword !== passwordData.confirmPassword && (
+                <p style={{ fontSize: '0.8rem', color: 'var(--danger-600)' }}>Passwords do not match</p>
+              )}
 
-              <div>
-                <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
-                  Confirm New Password
-                </label>
-                <div className="mt-1 relative">
-                  <input
-                    type={showConfirmPassword ? 'text' : 'password'}
-                    name="confirmPassword"
-                    id="confirmPassword"
-                    value={passwordData.confirmPassword}
-                    onChange={handlePasswordChange}
-                    className="block w-full pr-10 border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                    required
-                    minLength={6}
-                  />
-                  <button
-                    type="button"
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  >
-                    {showConfirmPassword ? (
-                      <EyeSlashIcon className="h-5 w-5 text-gray-400" />
-                    ) : (
-                      <EyeIcon className="h-5 w-5 text-gray-400" />
-                    )}
-                  </button>
-                </div>
-                {passwordData.newPassword && passwordData.confirmPassword && passwordData.newPassword !== passwordData.confirmPassword && (
-                  <p className="mt-1 text-sm text-red-600">Passwords do not match</p>
-                )}
-              </div>
-
-              <div className="flex justify-end space-x-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsChangingPassword(false);
-                    setPasswordData({
-                      currentPassword: '',
-                      newPassword: '',
-                      confirmPassword: '',
-                    });
-                    setError('');
-                    setMessage('');
-                  }}
-                  className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-                >
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
+                <button type="button" className="btn btn-ghost" onClick={() => { setIsChangingPassword(false); setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' }); setError(''); setMessage(''); }}>
                   Cancel
                 </button>
-                <button
-                  type="submit"
-                  disabled={isLoading || passwordData.newPassword !== passwordData.confirmPassword}
-                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
+                <button type="submit" disabled={isLoading || passwordData.newPassword !== passwordData.confirmPassword} className="btn btn-primary">
                   {isLoading ? 'Updating...' : 'Update Password'}
                 </button>
               </div>
             </form>
           ) : (
-            <div className="text-sm text-gray-500">
-              Click "Change Password" to update your password.
-            </div>
+            <p style={{ fontSize: '0.875rem', color: 'var(--navy-500)' }}>Click "Change Password" to update your password.</p>
           )}
         </div>
       </div>

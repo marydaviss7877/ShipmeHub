@@ -1,173 +1,418 @@
-import React, { useState } from 'react';
-import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Outlet, useLocation, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import {
   HomeIcon,
-  DocumentIcon,
   UserGroupIcon,
-  CogIcon,
   UserIcon,
   ArrowLeftOnRectangleIcon,
   Bars3Icon,
   XMarkIcon,
+  TruckIcon,
+  TagIcon,
+  ClipboardDocumentListIcon,
+  RectangleStackIcon,
+  BuildingStorefrontIcon,
+  Squares2X2Icon,
+  SignalIcon,
   BanknotesIcon,
+  BookOpenIcon,
+  PresentationChartLineIcon,
+  ChevronLeftIcon,
+  ChevronDownIcon,
+  BellIcon,
 } from '@heroicons/react/24/outline';
 
-const Layout: React.FC = () => {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { user, logout } = useAuth();
-  const location = useLocation();
-  const navigate = useNavigate();
+interface NavItem {
+  name: string;
+  href: string;
+  icon: React.ElementType;
+  current: boolean;
+}
 
-  const navigation = [
-    { name: 'Dashboard', href: '/dashboard', icon: HomeIcon, current: location.pathname === '/dashboard' },
-    { name: 'Files', href: '/files', icon: DocumentIcon, current: location.pathname === '/files' },
-    ...(user?.role === 'admin' ? [
-      { name: 'Admin Panel', href: '/admin', icon: UserGroupIcon, current: location.pathname === '/admin' },
-      { name: 'User Management', href: '/admin/users', icon: UserGroupIcon, current: location.pathname === '/admin/users' },
-    ] : []),
-    ...(user?.role === 'admin' || user?.role === 'reseller' ? [
-      { name: 'Balance Management', href: '/admin/balance', icon: BanknotesIcon, current: location.pathname === '/admin/balance' },
-    ] : []),
+interface NavSection {
+  key: string;
+  label: string;
+  items: NavItem[];
+}
+
+const COLLAPSED_KEY = 'sh_sidebar_collapsed';
+
+const Layout: React.FC = () => {
+  const [sidebarOpen, setSidebarOpen]   = useState(false);
+  const [collapsed, setCollapsed]       = useState(() => localStorage.getItem(COLLAPSED_KEY) === '1');
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+    overview: true, labels: true, management: true, account: true,
+  });
+  const [tooltip, setTooltip] = useState<{ name: string; y: number } | null>(null);
+  const tooltipTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const { user, logout } = useAuth();
+  const location         = useLocation();
+  const navigate         = useNavigate();
+
+  // Persist collapse state + sync CSS variable for fixed-position children
+  useEffect(() => {
+    localStorage.setItem(COLLAPSED_KEY, collapsed ? '1' : '0');
+    document.documentElement.style.setProperty('--sidebar-w', collapsed ? '72px' : '256px');
+  }, [collapsed]);
+
+  // Auto-expand sidebar on mobile breakpoint
+  useEffect(() => {
+    const onResize = () => { if (window.innerWidth < 768) setCollapsed(false); };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  // ── Navigation definitions ──────────────────────────────────────────────
+  const overviewNav: NavItem[] = [
+    { name: 'Dashboard',     href: '/dashboard', icon: HomeIcon,   current: location.pathname === '/dashboard' },
+    { name: 'Live Activity', href: '/activity',  icon: SignalIcon, current: location.pathname === '/activity'  },
+  ];
+
+  const labelsNav: NavItem[] = [
+    { name: 'Services',       href: '/carriers',            icon: TruckIcon,                 current: location.pathname.startsWith('/carriers') },
+    { name: 'Single Label',   href: '/labels/single',       icon: TagIcon,                   current: location.pathname === '/labels/single' },
+    { name: 'Bulk Labels',    href: '/labels/bulk',          icon: RectangleStackIcon,        current: location.pathname === '/labels/bulk' },
+    { name: 'Single History', href: '/labels/history',      icon: ClipboardDocumentListIcon, current: location.pathname === '/labels/history' },
+    { name: 'Bulk History',   href: '/labels/bulk-history', icon: ClipboardDocumentListIcon, current: location.pathname === '/labels/bulk-history' },
+  ];
+
+  const adminItems: NavItem[] = user?.role === 'admin' ? [
+    { name: 'Admin Panel',         href: '/admin',                     icon: UserGroupIcon,             current: location.pathname === '/admin' },
+    { name: 'Users',               href: '/admin/users',               icon: UserGroupIcon,             current: location.pathname.startsWith('/admin/users') },
+    { name: 'Vendors',             href: '/admin/vendors',             icon: BuildingStorefrontIcon,    current: location.pathname === '/admin/vendors' },
+    { name: 'Manifest Ops',        href: '/admin/manifest',            icon: Squares2X2Icon,            current: location.pathname === '/admin/manifest' },
+    { name: 'Sales Team',          href: '/admin/sales-agents',        icon: UserGroupIcon,             current: location.pathname === '/admin/sales-agents' },
+    { name: 'Finance',             href: '/admin/finance',             icon: BanknotesIcon,             current: location.pathname === '/admin/finance' },
+    { name: 'Cash Book',           href: '/admin/cashbook',            icon: BookOpenIcon,              current: location.pathname === '/admin/cashbook' },
+    { name: 'Financial Dashboard', href: '/admin/financial-dashboard', icon: PresentationChartLineIcon, current: location.pathname === '/admin/financial-dashboard' },
+  ] : user?.role === 'reseller' ? [
+    { name: 'My Clients', href: '/reseller/clients', icon: UserGroupIcon, current: location.pathname.startsWith('/reseller/clients') },
+    { name: 'Finance',    href: '/reseller/finance', icon: BanknotesIcon, current: location.pathname === '/reseller/finance' },
+  ] : [];
+
+  const accountNav: NavItem[] = [
     { name: 'Profile', href: '/profile', icon: UserIcon, current: location.pathname === '/profile' },
   ];
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
+  const sections: NavSection[] = [
+    { key: 'overview',    label: 'Overview',    items: overviewNav  },
+    { key: 'labels',      label: 'Labels',      items: labelsNav    },
+    ...(adminItems.length > 0 ? [{ key: 'management', label: 'Management', items: adminItems }] : []),
+    { key: 'account',     label: 'Account',     items: accountNav   },
+  ];
+
+  const allNav    = [...overviewNav, ...labelsNav, ...adminItems, ...accountNav];
+  const activePage = allNav.find(n => n.current);
+  const activeSection = sections.find(s => s.items.some(i => i.name === activePage?.name));
+  const initials  = `${user?.firstName?.charAt(0) ?? ''}${user?.lastName?.charAt(0) ?? ''}`;
+
+  const roleChip = user?.role === 'admin'
+    ? { bg: 'rgba(239,68,68,0.18)',    color: '#FCA5A5',  label: 'Admin'    }
+    : user?.role === 'reseller'
+    ? { bg: 'rgba(245,158,11,0.18)',   color: '#FCD34D',  label: 'Reseller' }
+    : { bg: 'rgba(59,130,246,0.18)',   color: '#93C5FD',  label: 'User'     };
+
+  const toggleSection = (key: string) =>
+    setOpenSections(prev => ({ ...prev, [key]: !prev[key] }));
+
+  const handleLogout = () => { logout(); navigate('/login'); };
+
+  // ── NavLink ──────────────────────────────────────────────────────────────
+  const NavLink = ({ item }: { item: NavItem }) => {
+    const handleMouseEnter = useCallback((e: React.MouseEvent<HTMLElement>) => {
+      if (!collapsed) return;
+      if (tooltipTimer.current) clearTimeout(tooltipTimer.current);
+      const rect = e.currentTarget.getBoundingClientRect();
+      setTooltip({ name: item.name, y: rect.top + rect.height / 2 });
+    }, [item.name]);
+
+    const handleMouseLeave = useCallback(() => {
+      tooltipTimer.current = setTimeout(() => setTooltip(null), 80);
+    }, []);
+
+    return (
+      <div className="nav-item-wrapper">
+        <Link
+          to={item.href}
+          className={`sidebar-link${item.current ? ' active' : ''}${collapsed ? ' icon-only' : ''}`}
+          onClick={() => setSidebarOpen(false)}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+        >
+          <item.icon className="nav-icon" />
+          {!collapsed && <span className="nav-label">{item.name}</span>}
+          {item.current && !collapsed && <span className="nav-active-dot" />}
+        </Link>
+      </div>
+    );
   };
 
   return (
-    <div className="h-screen flex overflow-hidden bg-gray-100">
-      {/* Mobile sidebar */}
-      <div className={`fixed inset-0 flex z-40 md:hidden ${sidebarOpen ? '' : 'hidden'}`}>
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-75" onClick={() => setSidebarOpen(false)} />
-        <div className="relative flex-1 flex flex-col max-w-xs w-full bg-white">
-          <div className="absolute top-0 right-0 -mr-12 pt-2">
-            <button
-              type="button"
-              className="ml-1 flex items-center justify-center h-10 w-10 rounded-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white"
-              onClick={() => setSidebarOpen(false)}
-            >
-              <XMarkIcon className="h-6 w-6 text-white" />
-            </button>
-          </div>
-          <div className="flex-1 h-0 pt-5 pb-4 overflow-y-auto">
-            <div className="flex-shrink-0 flex items-center px-4">
-              <h1 className="text-xl font-bold text-primary-600">USPS Label Portal</h1>
-            </div>
-            <nav className="mt-5 px-2 space-y-1">
-              {navigation.map((item) => (
-                <a
-                  key={item.name}
-                  href={item.href}
-                  className={`${
-                    item.current
-                      ? 'bg-primary-100 text-primary-900'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                  } group flex items-center px-2 py-2 text-base font-medium rounded-md`}
-                >
-                  <item.icon
-                    className={`${
-                      item.current ? 'text-primary-500' : 'text-gray-400 group-hover:text-gray-500'
-                    } mr-4 flex-shrink-0 h-6 w-6`}
-                  />
-                  {item.name}
-                </a>
-              ))}
-            </nav>
-          </div>
-          <div className="flex-shrink-0 flex border-t border-gray-200 p-4">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="h-8 w-8 rounded-full bg-primary-500 flex items-center justify-center">
-                  <span className="text-sm font-medium text-white">
-                    {user?.firstName?.charAt(0)}{user?.lastName?.charAt(0)}
-                  </span>
-                </div>
-              </div>
-              <div className="ml-3">
-                <p className="text-base font-medium text-gray-700">{user?.fullName}</p>
-                <p className="text-sm font-medium text-gray-500 capitalize">{user?.role}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div style={{ minHeight: '100vh' }}>
 
-      {/* Desktop sidebar */}
-      <div className="hidden md:flex md:flex-shrink-0">
-        <div className="flex flex-col w-64">
-          <div className="flex flex-col h-0 flex-1 border-r border-gray-200 bg-white">
-            <div className="flex-1 flex flex-col pt-5 pb-4 overflow-y-auto">
-              <div className="flex items-center flex-shrink-0 px-4">
-                <h1 className="text-xl font-bold text-primary-600">USPS Label Portal</h1>
-              </div>
-              <nav className="mt-5 flex-1 px-2 space-y-1">
-                {navigation.map((item) => (
-                  <a
-                    key={item.name}
-                    href={item.href}
-                    className={`${
-                      item.current
-                        ? 'bg-primary-100 text-primary-900'
-                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                    } group flex items-center px-2 py-2 text-sm font-medium rounded-md`}
-                  >
-                    <item.icon
-                      className={`${
-                        item.current ? 'text-primary-500' : 'text-gray-400 group-hover:text-gray-500'
-                      } mr-3 flex-shrink-0 h-6 w-6`}
-                    />
-                    {item.name}
-                  </a>
-                ))}
-              </nav>
-            </div>
-            <div className="flex-shrink-0 flex border-t border-gray-200 p-4">
-              <div className="flex items-center w-full">
-                <div className="flex-shrink-0">
-                  <div className="h-8 w-8 rounded-full bg-primary-500 flex items-center justify-center">
-                    <span className="text-sm font-medium text-white">
-                      {user?.firstName?.charAt(0)}{user?.lastName?.charAt(0)}
-                    </span>
-                  </div>
-                </div>
-                <div className="ml-3 flex-1">
-                  <p className="text-sm font-medium text-gray-700">{user?.fullName}</p>
-                  <p className="text-xs font-medium text-gray-500 capitalize">{user?.role}</p>
-                </div>
-                <button
-                  onClick={handleLogout}
-                  className="ml-2 p-1 rounded-md text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                >
-                  <ArrowLeftOnRectangleIcon className="h-5 w-5" />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* Mobile overlay */}
+      {sidebarOpen && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 39,
+            background: 'rgba(15,23,42,0.65)',
+            backdropFilter: 'blur(4px)',
+            WebkitBackdropFilter: 'blur(4px)',
+          }}
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
 
-      {/* Main content */}
-      <div className="flex flex-col w-0 flex-1 overflow-hidden">
-        <div className="md:hidden pl-1 pt-1 sm:pl-3 sm:pt-3">
+      {/* ── Sidebar ─────────────────────────────────────────────────── */}
+      <aside className={`sidebar${sidebarOpen ? ' open' : ''}${collapsed ? ' collapsed' : ''}`}>
+
+        {/* Logo / brand */}
+        <div className={`sidebar-logo${collapsed ? ' sidebar-logo-collapsed' : ''}`}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 10, overflow: 'hidden', flex: 1, minWidth: 0 }}>
+            <div className="sidebar-logo-icon">
+              <TruckIcon style={{ width: 18, height: 18, color: '#fff' }} />
+            </div>
+            {!collapsed && (
+              <div style={{ overflow: 'hidden', flex: 1 }}>
+                <div className="sidebar-brand-name">ShipmeHub</div>
+                <div className="sidebar-brand-sub">Label Portal</div>
+              </div>
+            )}
+          </div>
+
+          {/* Collapse toggle — desktop only */}
           <button
-            type="button"
-            className="-ml-0.5 -mt-0.5 h-12 w-12 inline-flex items-center justify-center rounded-md text-gray-500 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary-500"
-            onClick={() => setSidebarOpen(true)}
+            className="sidebar-collapse-btn"
+            onClick={() => setCollapsed(c => !c)}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
-            <Bars3Icon className="h-6 w-6" />
+            <ChevronLeftIcon
+              style={{
+                width: 13, height: 13,
+                transition: 'transform var(--transition-base)',
+                transform: collapsed ? 'rotate(180deg)' : 'rotate(0deg)',
+              }}
+            />
           </button>
         </div>
-        <main className="flex-1 relative overflow-y-auto focus:outline-none">
-          <div className="py-6">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
-              <Outlet />
+
+        {/* Mobile close */}
+        <button
+          className="sidebar-mobile-close"
+          onClick={() => setSidebarOpen(false)}
+        >
+          <XMarkIcon style={{ width: 18, height: 18 }} />
+        </button>
+
+        {/* ── Navigation ──────────────────────────────────────────────── */}
+        <nav style={{ flex: 1, paddingTop: 6 }}>
+          {sections.map((section, si) => (
+            <div key={section.key} className={`sidebar-section${collapsed ? ' sidebar-section-collapsed' : ''}`}>
+
+              {/* Section header (expanded mode) */}
+              {!collapsed ? (
+                <button
+                  className="sidebar-section-btn"
+                  onClick={() => toggleSection(section.key)}
+                >
+                  <span className="sidebar-nav-label">{section.label}</span>
+                  <ChevronDownIcon
+                    style={{
+                      width: 11, height: 11,
+                      color: 'rgba(255,255,255,0.25)',
+                      flexShrink: 0,
+                      transition: 'transform var(--transition-fast)',
+                      transform: openSections[section.key] !== false ? 'rotate(0)' : 'rotate(-90deg)',
+                    }}
+                  />
+                </button>
+              ) : (
+                si > 0 && <div className="sidebar-section-rule" />
+              )}
+
+              {/* Section items */}
+              <div
+                className="sidebar-section-items"
+                style={{
+                  maxHeight: collapsed || openSections[section.key] !== false ? '600px' : '0px',
+                  overflow: 'hidden',
+                  transition: 'max-height 0.28s cubic-bezier(0.4,0,0.2,1)',
+                }}
+              >
+                {section.items.map(item => (
+                  <NavLink key={item.name} item={item} />
+                ))}
+              </div>
             </div>
+          ))}
+        </nav>
+
+        {/* ── User footer ─────────────────────────────────────────────── */}
+        <div className={`sidebar-footer${collapsed ? ' sidebar-footer-collapsed' : ''}`}>
+          {collapsed ? (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 6 }}>
+                <div className="avatar avatar-sm avatar-indigo" title={`${user?.firstName} ${user?.lastName} · ${user?.role}`}>
+                  {initials}
+                </div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'center' }}>
+                <button onClick={handleLogout} title="Sign out" className="sidebar-logout-btn">
+                  <ArrowLeftOnRectangleIcon style={{ width: 16, height: 16 }} />
+                </button>
+              </div>
+            </>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div className="avatar avatar-sm avatar-indigo">{initials}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {user?.firstName} {user?.lastName}
+                </div>
+                <span style={{
+                  display: 'inline-block', marginTop: 2,
+                  fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.07em',
+                  textTransform: 'uppercase', padding: '1px 7px', borderRadius: 99,
+                  background: roleChip.bg, color: roleChip.color,
+                }}>
+                  {roleChip.label}
+                </span>
+              </div>
+              <button onClick={handleLogout} title="Sign out" className="sidebar-logout-btn">
+                <ArrowLeftOnRectangleIcon style={{ width: 16, height: 16 }} />
+              </button>
+            </div>
+          )}
+        </div>
+      </aside>
+
+      {/* ── Main content ────────────────────────────────────────────── */}
+      <div className={`main-content${collapsed ? ' sidebar-collapsed' : ''}`}>
+
+        {/* Top bar */}
+        <header className="top-bar">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+
+            {/* Mobile hamburger */}
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(true)}
+              className="mobile-menu-btn"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--navy-500)', padding: 4, borderRadius: 6, display: 'none' }}
+            >
+              <Bars3Icon style={{ width: 22, height: 22 }} />
+            </button>
+
+            {/* Breadcrumb */}
+            <nav style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              {activeSection && activePage && (
+                <>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--navy-400)', fontWeight: 500 }}>
+                    {activeSection.label}
+                  </span>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--navy-300)' }}>/</span>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--navy-800)' }}>
+                    {activePage.name}
+                  </span>
+                </>
+              )}
+              {!activePage && (
+                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--navy-800)' }}>Dashboard</span>
+              )}
+            </nav>
+          </div>
+
+          {/* Right side */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+
+            {/* Notification bell */}
+            <button className="topbar-icon-btn" title="Notifications">
+              <BellIcon style={{ width: 17, height: 17 }} />
+            </button>
+
+            {/* Divider */}
+            <div style={{ width: 1, height: 24, background: 'var(--navy-100)' }} />
+
+            {/* User chip */}
+            <div className="topbar-user-chip">
+              <div className="avatar avatar-sm avatar-indigo">{initials}</div>
+              <div style={{ lineHeight: 1.3 }}>
+                <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--navy-900)' }}>
+                  {user?.firstName} {user?.lastName}
+                </div>
+                <div style={{ fontSize: '0.67rem', color: 'var(--navy-500)', textTransform: 'capitalize' }}>
+                  {user?.role}
+                </div>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Page content */}
+        <main className="page-content">
+          <div key={location.pathname} className="animate-fadeInUp">
+            <Outlet />
           </div>
         </main>
       </div>
+
+      {/* Fixed tooltip — escapes sidebar overflow clipping */}
+      {collapsed && tooltip && (
+        <div
+          style={{
+            position: 'fixed',
+            left: 82,
+            top: tooltip.y,
+            transform: 'translateY(-50%)',
+            zIndex: 9999,
+            pointerEvents: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 0,
+            animation: 'tooltipPop 0.12s cubic-bezier(0.34,1.56,0.64,1) both',
+          }}
+        >
+          {/* Arrow */}
+          <div style={{
+            width: 0, height: 0,
+            borderTop: '5px solid transparent',
+            borderBottom: '5px solid transparent',
+            borderRight: '6px solid #1e293b',
+          }} />
+          {/* Label */}
+          <div style={{
+            background: '#1e293b',
+            color: '#fff',
+            fontSize: '0.78rem',
+            fontWeight: 600,
+            padding: '6px 12px',
+            borderRadius: 8,
+            whiteSpace: 'nowrap',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.28)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            letterSpacing: '0.01em',
+          }}>
+            {tooltip.name}
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes tooltipPop {
+          from { opacity: 0; transform: translateY(-50%) scale(0.88) translateX(-6px); }
+          to   { opacity: 1; transform: translateY(-50%) scale(1)    translateX(0); }
+        }
+        @media (max-width: 768px) {
+          .mobile-menu-btn        { display: flex !important; }
+          .sidebar-collapse-btn   { display: none !important; }
+          .sidebar-mobile-close   { display: flex !important; }
+        }
+        @media (min-width: 769px) {
+          .sidebar-mobile-close   { display: none !important; }
+        }
+      `}</style>
     </div>
   );
 };

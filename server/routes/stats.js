@@ -1,0 +1,426 @@
+const express = require('express');
+const mongoose = require('mongoose');
+const { authenticateToken } = require('../middleware/auth');
+const User        = require('../models/User');
+const Label       = require('../models/Label');
+const ManifestJob = require('../models/ManifestJob');
+const Vendor      = require('../models/Vendor');
+const Balance     = require('../models/Balance');
+
+const router = express.Router();
+
+// GET /api/stats  — role-aware stats
+router.get('/', authenticateToken, async (req, res) => {
+  try {
+    const { role, _id: userId } = req.user;
+    if (role === 'admin')    return res.json(await adminStats());
+    if (role === 'reseller') return res.json(await resellerStats(userId));
+    return res.json(await userStats(userId));
+  } catch (err) {
+    console.error('Stats error:', err);
+    res.status(500).json({ message: 'Error fetching stats' });
+  }
+});
+
+// ── Admin ─────────────────────────────────────────────────────────────────────
+async function adminStats() {
+  const now           = new Date();
+  const startOfMonth  = new Date(now.getFullYear(), now.getMonth(), 1);
+  const startOfToday  = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  const [
+    userGroups,
+    newThisMonth,
+    labelGroups,
+    labelsToday,
+    manifestGroups,
+    vendorGroups,
+    totalBalanceHeld,
+    recentManifests,
+    recentUsers,
+  ] = await Promise.all([
+    // Users by role + isActive
+    User.aggregate([
+      { $group: { _id: { role: '$role', active: '$isActive' }, count: { $sum: 1 } } },
+    ]),
+    // New users this month
+    User.countDocuments({ createdAt: { $gte: startOfMonth } }),
+    // Labels by carrier + status
+    Label.aggregate([
+      { $group: { _id: { carrier: '$carrier', status: '$status' }, count: { $sum: 1 }, revenue: { $sum: '$price' } } },
+    ]),
+    // Labels generated today
+    Label.countDocuments({ createdAt: { $gte: startOfToday }, status: 'generated' }),
+    // Manifest jobs by status
+    ManifestJob.aggregate([
+      { $group: { _id: '$status', count: { $sum: 1 }, revenue: { $sum: '$userBilling.totalAmount' } } },
+    ]),
+    // Active vendors + payables
+    Vendor.aggregate([
+      { $group: { _id: '$isActive', count: { $sum: 1 }, dueBalance: { $sum: '$dueBalance' }, totalEarnings: { $sum: '$totalEarnings' } } },
+    ]),
+    // Sum all user balances
+    Balance.aggregate([
+      { $group: { _id: null, total: { $sum: '$currentBalance' } } },
+    ]),
+    // Manifest jobs needing admin action
+    ManifestJob.find({ status: { $in: ['under_review', 'open', 'uploaded'] } })
+      .populate('user', 'firstName lastName email')
+      .populate('assignedVendor', 'name')
+      .sort({ createdAt: -1 })
+      .limit(8)
+      .select('carrier status userBilling assignedVendor user createdAt'),
+    // Recent signups
+    User.find().sort({ createdAt: -1 }).limit(6).select('firstName lastName email role isActive createdAt'),
+  ]);
+
+  // --- process user groups ---
+  const users = { total: 0, admin: 0, reseller: 0, user: 0, active: 0, inactive: 0, newThisMonth };
+  for (const g of userGroups) {
+    users.total += g.count;
+    users[g._id.role] = (users[g._id.role] || 0) + g.count;
+    if (g._id.active) users.active += g.count;
+    else users.inactive += g.count;
+  }
+
+  // --- process label groups ---
+  const labels = { total: 0, generated: 0, failed: 0, revenue: 0, today: labelsToday, byCarrier: {} };
+  for (const g of labelGroups) {
+    labels.total    += g.count;
+    labels.revenue  += g.revenue || 0;
+    if (g._id.status === 'generated') labels.generated += g.count;
+    if (g._id.status === 'failed')    labels.failed    += g.count;
+    const c = g._id.carrier || 'Other';
+    labels.byCarrier[c] = (labels.byCarrier[c] || 0) + g.count;
+  }
+
+  // --- process manifest groups ---
+  const ACTIVE_STATUSES = ['open', 'assigned', 'accepted', 'uploaded'];
+  const manifests = { total: 0, active: 0, underReview: 0, completed: 0, cancelled: 0, revenue: 0, byStatus: {} };
+  for (const g of manifestGroups) {
+    manifests.total   += g.count;
+    manifests.revenue += g.revenue || 0;
+    manifests.byStatus[g._id] = g.count;
+    if (ACTIVE_STATUSES.includes(g._id)) manifests.active += g.count;
+    if (g._id === 'under_review') manifests.underReview += g.count;
+    if (g._id === 'completed')    manifests.completed   += g.count;
+    if (g._id === 'cancelled')    manifests.cancelled   += g.count;
+  }
+
+  // --- process vendor groups ---
+  const vendors = { active: 0, inactive: 0, dueBalance: 0, totalEarnings: 0 };
+  for (const g of vendorGroups) {
+    if (g._id === true) { vendors.active = g.count; vendors.dueBalance = g.dueBalance; vendors.totalEarnings = g.totalEarnings; }
+    else vendors.inactive = g.count;
+  }
+
+  return {
+    users,
+    labels,
+    manifests,
+    vendors,
+    totalBalanceHeld: totalBalanceHeld[0]?.total || 0,
+    totalRevenue: labels.revenue + manifests.revenue,
+    recentManifests,
+    recentUsers,
+  };
+}
+
+// ── Reseller ──────────────────────────────────────────────────────────────────
+async function resellerStats(userId) {
+  const me = await User.findById(userId).select('clients');
+  const clientIds = (me?.clients || []).map(id => new mongoose.Types.ObjectId(String(id)));
+
+  const [
+    clients,
+    myBalance,
+    labelGroups,
+    manifestGroups,
+  ] = await Promise.all([
+    User.find({ _id: { $in: clientIds } }).select('firstName lastName email isActive createdAt').sort({ createdAt: -1 }),
+    Balance.getOrCreateBalance(userId),
+    Label.aggregate([
+      { $match: { user: { $in: clientIds } } },
+      { $group: { _id: { carrier: '$carrier' }, count: { $sum: 1 }, revenue: { $sum: '$price' } } },
+    ]),
+    ManifestJob.aggregate([
+      { $match: { user: { $in: clientIds } } },
+      { $group: { _id: '$status', count: { $sum: 1 }, revenue: { $sum: '$userBilling.totalAmount' } } },
+    ]),
+  ]);
+
+  const labelTotals = { total: 0, revenue: 0, byCarrier: {} };
+  for (const g of labelGroups) {
+    labelTotals.total   += g.count;
+    labelTotals.revenue += g.revenue || 0;
+    labelTotals.byCarrier[g._id.carrier || 'Other'] = g.count;
+  }
+
+  const ACTIVE_STATUSES = ['open', 'assigned', 'accepted', 'uploaded', 'under_review'];
+  const manifestTotals = { total: 0, active: 0, completed: 0, revenue: 0 };
+  for (const g of manifestGroups) {
+    manifestTotals.total   += g.count;
+    manifestTotals.revenue += g.revenue || 0;
+    if (ACTIVE_STATUSES.includes(g._id)) manifestTotals.active    += g.count;
+    if (g._id === 'completed')            manifestTotals.completed += g.count;
+  }
+
+  // compute totals from Balance transactions
+  const txns      = myBalance.transactions || [];
+  const deposited = txns.filter(t => t.type === 'topup').reduce((s, t) => s + t.amount, 0);
+  const spent     = txns.filter(t => t.type === 'deduction').reduce((s, t) => s + t.amount, 0);
+
+  return {
+    clientCount:    clientIds.length,
+    activeClients:  clients.filter(c => c.isActive).length,
+    myBalance: {
+      currentBalance: myBalance.currentBalance,
+      totalDeposited: deposited,
+      totalSpent:     spent,
+    },
+    labels:    labelTotals,
+    manifests: manifestTotals,
+    totalClientSpend: labelTotals.revenue + manifestTotals.revenue,
+    recentClients: clients.slice(0, 6),
+  };
+}
+
+// ── Regular User ──────────────────────────────────────────────────────────────
+async function userStats(userId) {
+  const uid = new mongoose.Types.ObjectId(String(userId));
+
+  const [
+    labelGroups,
+    manifestGroups,
+    balance,
+    recentLabels,
+    activeManifests,
+  ] = await Promise.all([
+    Label.aggregate([
+      { $match: { user: uid } },
+      { $group: { _id: { carrier: '$carrier', status: '$status' }, count: { $sum: 1 }, spent: { $sum: '$price' } } },
+    ]),
+    ManifestJob.aggregate([
+      { $match: { user: uid } },
+      { $group: { _id: '$status', count: { $sum: 1 } } },
+    ]),
+    Balance.getOrCreateBalance(userId),
+    Label.find({ user: userId }).sort({ createdAt: -1 }).limit(5)
+      .select('carrier vendorName trackingId price status createdAt isBulk bulkJobId'),
+    ManifestJob.find({ user: userId, status: { $in: ['open','assigned','accepted','uploaded','under_review'] } })
+      .populate('assignedVendor', 'name')
+      .sort({ createdAt: -1 })
+      .limit(4)
+      .select('carrier status userBilling assignedVendor createdAt'),
+  ]);
+
+  const labels = { total: 0, generated: 0, failed: 0, spent: 0, byCarrier: {} };
+  for (const g of labelGroups) {
+    labels.total += g.count;
+    labels.spent += g.spent || 0;
+    if (g._id.status === 'generated') labels.generated += g.count;
+    if (g._id.status === 'failed')    labels.failed    += g.count;
+    const c = g._id.carrier || 'Other';
+    labels.byCarrier[c] = (labels.byCarrier[c] || 0) + g.count;
+  }
+
+  const ACTIVE = ['open','assigned','accepted','uploaded','under_review'];
+  const manifests = { total: 0, active: 0, completed: 0, cancelled: 0 };
+  for (const g of manifestGroups) {
+    manifests.total += g.count;
+    if (ACTIVE.includes(g._id))   manifests.active    += g.count;
+    if (g._id === 'completed')     manifests.completed += g.count;
+    if (g._id === 'cancelled')     manifests.cancelled += g.count;
+  }
+
+  const txns      = balance.transactions || [];
+  const deposited = txns.filter(t => t.type === 'topup').reduce((s, t) => s + t.amount, 0);
+  const spent     = txns.filter(t => t.type === 'deduction').reduce((s, t) => s + t.amount, 0);
+
+  return {
+    balance: {
+      currentBalance: balance.currentBalance,
+      totalDeposited: deposited,
+      totalSpent:     spent,
+    },
+    labels,
+    manifests,
+    recentLabels,
+    activeManifests,
+  };
+}
+
+// ── GET /api/stats/label-chart  (admin only) ─────────────────────────────────
+// Query params:
+//   from    — ISO date string, default = 30 days ago
+//   to      — ISO date string, default = today
+//   carrier — 'all' | 'USPS' | 'UPS' | 'FedEx' | 'DHL'  (default 'all')
+//
+// Auto-grouping:
+//   ≤ 31 days  → daily
+//   ≤ 90 days  → weekly  (week starting Monday)
+//   > 90 days  → monthly
+//
+// carrier = 'all'  → lines per carrier
+// carrier = <name> → lines per vendor (API labels + manifest jobs combined)
+router.get('/label-chart', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') return res.status(403).json({ message: 'Forbidden' });
+
+    // ── Date range ────────────────────────────────────────────────────────────
+    const now     = new Date();
+    const rawFrom = req.query.from ? new Date(req.query.from) : new Date(now - 30 * 86400000);
+    const rawTo   = req.query.to   ? new Date(req.query.to)   : now;
+
+    const start = new Date(rawFrom); start.setHours(0, 0, 0, 0);
+    const end   = new Date(rawTo);   end.setHours(23, 59, 59, 999);
+
+    const carrier = req.query.carrier || 'all';
+
+    // ── Auto-grouping ─────────────────────────────────────────────────────────
+    const diffDays = Math.ceil((end - start) / 86400000);
+    const grouping = diffDays <= 31 ? 'day' : diffDays <= 90 ? 'week' : 'month';
+
+    // ── Helper: build ISO date key ────────────────────────────────────────────
+    const isoKey = (y, m, d) =>
+      `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+
+    // ── Helper: generate bucket list ─────────────────────────────────────────
+    function buildBuckets() {
+      const buckets = [];
+      if (grouping === 'day') {
+        const cur = new Date(start);
+        while (cur <= end) {
+          const y = cur.getFullYear(), mo = cur.getMonth() + 1, d = cur.getDate();
+          buckets.push({ _key: isoKey(y, mo, d), label: `${mo}/${d}`, total: 0 });
+          cur.setDate(cur.getDate() + 1);
+        }
+      } else if (grouping === 'week') {
+        const cur = new Date(start);
+        // Align back to Monday
+        const dow = cur.getDay() === 0 ? 6 : cur.getDay() - 1;
+        cur.setDate(cur.getDate() - dow);
+        cur.setHours(0, 0, 0, 0);
+        while (cur <= end) {
+          const wEnd = new Date(cur); wEnd.setDate(wEnd.getDate() + 6);
+          buckets.push({ _key: isoKey(cur.getFullYear(), cur.getMonth()+1, cur.getDate()), _wEnd: new Date(wEnd), label: `${cur.getMonth()+1}/${cur.getDate()}`, total: 0 });
+          cur.setDate(cur.getDate() + 7);
+        }
+      } else {
+        const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        const cur = new Date(start.getFullYear(), start.getMonth(), 1);
+        while (cur <= end) {
+          buckets.push({ _key: `${cur.getFullYear()}-${cur.getMonth()+1}`, label: `${MONTHS[cur.getMonth()]} ${cur.getFullYear()}`, total: 0 });
+          cur.setMonth(cur.getMonth() + 1);
+        }
+      }
+      return buckets;
+    }
+
+    // ── Helper: find bucket for a raw date row (_id has year/month/day) ──────
+    function findBucket(buckets, id) {
+      const k = isoKey(id.year, id.month, id.day);
+      if (grouping === 'day') return buckets.find(b => b._key === k);
+      if (grouping === 'week') {
+        const d = new Date(k);
+        return buckets.find(b => d >= new Date(b._key) && d <= b._wEnd);
+      }
+      return buckets.find(b => b._key === `${id.year}-${id.month}`);
+    }
+
+    const dayGroupStage = {
+      year:  { $year:  '$createdAt' },
+      month: { $month: '$createdAt' },
+      day:   { $dayOfMonth: '$createdAt' },
+    };
+
+    // ══════════════════════════════════════════════════════════════════════════
+    if (carrier === 'all') {
+      // ── All carriers: API labels + completed manifest jobs ─────────────────
+      const CARRIERS = ['USPS', 'UPS', 'FedEx', 'DHL'];
+
+      const [labelRows, manifestRows] = await Promise.all([
+        // API-generated labels (each row = 1 label)
+        Label.aggregate([
+          { $match: { createdAt: { $gte: start, $lte: end }, status: 'generated' } },
+          { $group: { _id: { ...dayGroupStage, carrier: '$carrier' }, count: { $sum: 1 } } },
+        ]),
+        // Completed manifest jobs (each row = N labels via userBilling.labelCount)
+        ManifestJob.aggregate([
+          { $match: { createdAt: { $gte: start, $lte: end }, status: 'completed' } },
+          { $group: { _id: { ...dayGroupStage, carrier: '$carrier' }, count: { $sum: '$userBilling.labelCount' } } },
+        ]),
+      ]);
+
+      const buckets = buildBuckets();
+
+      for (const r of [...labelRows, ...manifestRows]) {
+        const b = findBucket(buckets, r._id);
+        if (b && CARRIERS.includes(r._id.carrier)) {
+          b[r._id.carrier] = (b[r._id.carrier] || 0) + r.count;
+          b.total           = (b.total           || 0) + r.count;
+        }
+      }
+
+      return res.json({ data: buckets, keys: CARRIERS, grouping });
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // ── Specific carrier → per-vendor breakdown ────────────────────────────
+    const [labelRows, manifestRows] = await Promise.all([
+      // API-generated labels
+      Label.aggregate([
+        { $match: { createdAt: { $gte: start, $lte: end }, status: 'generated', carrier } },
+        { $group: { _id: { ...dayGroupStage, vendor: '$vendorName' }, count: { $sum: 1 } } },
+      ]),
+      // Manifest jobs (only completed; count label qty not job qty)
+      ManifestJob.aggregate([
+        { $match: { createdAt: { $gte: start, $lte: end }, carrier, status: 'completed' } },
+        { $lookup: { from: 'vendors',        localField: 'vendor',         foreignField: '_id', as: '_v'  } },
+        { $lookup: { from: 'manifestvendors', localField: 'assignedVendor', foreignField: '_id', as: '_mv' } },
+        { $group: {
+            _id: {
+              ...dayGroupStage,
+              vendor: {
+                $ifNull: [
+                  { $arrayElemAt: ['$_v.name',  0] },
+                  { $arrayElemAt: ['$_mv.name', 0] },
+                ],
+              },
+            },
+            count: { $sum: '$userBilling.labelCount' },
+        }},
+      ]),
+    ]);
+
+    // Collect all vendor names seen
+    const vendorSet = new Set();
+    for (const r of labelRows)    if (r._id.vendor) vendorSet.add(r._id.vendor);
+    for (const r of manifestRows) if (r._id.vendor) vendorSet.add(r._id.vendor);
+
+    const buckets = buildBuckets();
+
+    for (const r of [...labelRows, ...manifestRows]) {
+      const vName = r._id.vendor || 'Unknown';
+      const b = findBucket(buckets, r._id);
+      if (b) {
+        b[vName]  = (b[vName]  || 0) + r.count;
+        b.total   = (b.total   || 0) + r.count;
+      }
+    }
+
+    // Sort vendors by total (highest first)
+    const vendorTotals = Array.from(vendorSet)
+      .map(name => ({ name, total: buckets.reduce((s, b) => s + (b[name] || 0), 0) }))
+      .filter(v => v.total > 0)
+      .sort((a, b) => b.total - a.total);
+
+    res.json({ data: buckets, keys: vendorTotals.map(v => v.name), vendorTotals, grouping });
+
+  } catch (err) {
+    console.error('Label chart error:', err);
+    res.status(500).json({ message: 'Error fetching chart data' });
+  }
+});
+
+module.exports = router;

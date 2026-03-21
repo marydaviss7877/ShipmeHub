@@ -51,7 +51,13 @@ const userSchema = new mongoose.Schema({
   managedUsers: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
-  }]
+  }],
+  // Lead acquisition channel — admin-only, not visible to the user
+  source: {
+    type: String,
+    enum: ['Organic', 'Paid Ads', null],
+    default: null,
+  }
 }, {
   timestamps: true
 });
@@ -62,16 +68,10 @@ userSchema.index({ role: 1 });
 userSchema.index({ isActive: 1 });
 
 // Hash password before saving
-userSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) return next();
-  
-  try {
-    const salt = await bcrypt.genSalt(12);
-    this.password = await bcrypt.hash(this.password, salt);
-    next();
-  } catch (error) {
-    next(error);
-  }
+userSchema.pre('save', async function() {
+  if (!this.isModified('password')) return;
+  const salt = await bcrypt.genSalt(12);
+  this.password = await bcrypt.hash(this.password, salt);
 });
 
 // Compare password method

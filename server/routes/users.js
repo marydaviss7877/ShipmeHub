@@ -1,92 +1,144 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
-const { authenticateToken, authorize } = require('../middleware/auth');
 const User = require('../models/User');
-const { sendEmail, emailTemplates } = require('../utils/email');
+const Balance = require('../models/Balance');
+const Rate = require('../models/Rate');
+const { authenticateToken, authorize } = require('../middleware/auth');
 
 const router = express.Router();
 
-// @route   GET /api/users
-// @desc    Get all users (admin only)
-// @access  Private (Admin)
+// ── GET /api/users ────────────────────────────────────────────
+// Get all users (admin only)
 router.get('/', authenticateToken, authorize('admin'), async (req, res) => {
   try {
     const { role, isActive, page = 1, limit = 10, search } = req.query;
-    
-    let query = {};
-    
-    if (role) {
-      query.role = role;
-    }
-    
-    if (isActive !== undefined) {
-      query.isActive = isActive === 'true';
-    }
-    
+
+    const filter = {};
+    if (role) filter.role = role;
+    if (isActive !== undefined) filter.isActive = isActive === 'true';
     if (search) {
-      query.$or = [
+      filter.$or = [
         { firstName: { $regex: search, $options: 'i' } },
-        { lastName: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } }
+        { lastName:  { $regex: search, $options: 'i' } },
+        { email:     { $regex: search, $options: 'i' } }
       ];
     }
 
-    const users = await User.find(query)
-      .select('-password')
-      .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
-
-    const total = await User.countDocuments(query);
+    const total = await User.countDocuments(filter);
+    const users = await User.find(filter)
+      .skip((page - 1) * limit)
+      .limit(parseInt(limit))
+      .select('-password');
 
     res.json({
       users,
       totalPages: Math.ceil(total / limit),
-      currentPage: page,
+      currentPage: parseInt(page),
       total
     });
-
   } catch (error) {
     console.error('Get users error:', error);
-    res.status(500).json({
-      message: 'Server error getting users'
-    });
+    res.status(500).json({ message: 'Server error getting users' });
   }
 });
 
-// @route   GET /api/users/:id
-// @desc    Get user by ID
-// @access  Private
+// ── GET /api/users/reseller/clients ───────────────────────────
+// Get the logged-in reseller's client list
+router.get('/reseller/clients', authenticateToken, authorize('admin', 'reseller'), async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).populate('clients', '-password');
+    res.json({ clients: user.clients || [] });
+  } catch (error) {
+    console.error('Get reseller clients error:', error);
+    res.status(500).json({ message: 'Server error getting clients' });
+  }
+});
+
+// ── POST /api/users/reseller/clients ──────────────────────────
+// Create a new client user under the logged-in reseller
+router.post('/reseller/clients', authenticateToken, authorize('admin', 'reseller'), [
+  body('firstName').trim().notEmpty().withMessage('First name is required'),
+  body('lastName').trim().notEmpty().withMessage('Last name is required'),
+  body('email').isEmail().normalizeEmail().withMessage('Please provide a valid email'),
+  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ message: 'Validation failed', errors: errors.array() });
+    }
+
+    const { firstName, lastName, email, password } = req.body;
+
+    const existing = await User.findOne({ email });
+    if (existing) {
+      return res.status(400).json({ message: 'User already exists with this email' });
+    }
+
+    const client = await User.create({ firstName, lastName, email, password, role: 'user' });
+
+    await Balance.create({ user: client._id, currentBalance: 0, transactions: [] });
+    await Rate.create({ user: client._id, labelRate: 1.00, setBy: req.user._id, notes: 'Default rate set by reseller' });
+
+    await User.findByIdAndUpdate(req.user._id, { $push: { clients: client._id } });
+
+    res.status(201).json({ message: 'Client created successfully', user: client });
+  } catch (error) {
+    console.error('Create reseller client error:', error);
+    res.status(500).json({ message: 'Server error creating client' });
+  }
+});
+
+// ── DELETE /api/users/reseller/clients/:clientId ──────────────
+// Remove and delete a client from the logged-in reseller
+router.delete('/reseller/clients/:clientId', authenticateToken, authorize('admin', 'reseller'), async (req, res) => {
+  try {
+    const { clientId } = req.params;
+
+    const reseller = await User.findById(req.user._id);
+    const owns = (reseller.clients || []).map(c => c.toString()).includes(clientId);
+    if (!owns) {
+      return res.status(403).json({ message: 'Client not found in your account' });
+    }
+
+    await User.findByIdAndUpdate(req.user._id, { $pull: { clients: clientId } });
+    await User.findByIdAndDelete(clientId);
+    await Balance.deleteOne({ user: clientId });
+    await Rate.deleteMany({ user: clientId });
+
+    res.json({ message: 'Client deleted successfully' });
+  } catch (error) {
+    console.error('Delete reseller client error:', error);
+    res.status(500).json({ message: 'Server error deleting client' });
+  }
+});
+
+// ── GET /api/users/:id ────────────────────────────────────────
 router.get('/:id', authenticateToken, async (req, res) => {
   try {
-    const user = await User.findById(req.params.id).select('-password');
-    
-    if (!user) {
-      return res.status(404).json({
-        message: 'User not found'
-      });
+    const isSelf = req.user._id.toString() === req.params.id;
+    const isAdmin = req.user.role === 'admin';
+    let isResellerClient = false;
+    if (req.user.role === 'reseller') {
+      const me = await User.findById(req.user._id).select('clients');
+      isResellerClient = (me?.clients || []).map(String).includes(req.params.id);
+    }
+    if (!isAdmin && !isSelf && !isResellerClient) {
+      return res.status(403).json({ message: 'Access denied' });
     }
 
-    // Check permissions
-    if (req.user.role !== 'admin' && req.user._id.toString() !== req.params.id) {
-      return res.status(403).json({
-        message: 'Access denied'
-      });
-    }
+    const user = await User.findById(req.params.id).select('-password');
+    if (!user) return res.status(404).json({ message: 'User not found' });
 
     res.json({ user });
-
   } catch (error) {
     console.error('Get user error:', error);
-    res.status(500).json({
-      message: 'Server error getting user'
-    });
+    res.status(500).json({ message: 'Server error getting user' });
   }
 });
 
-// @route   POST /api/users
-// @desc    Create new user (admin only)
-// @access  Private (Admin)
+// ── POST /api/users ───────────────────────────────────────────
+// Create new user (admin only)
 router.post('/', authenticateToken, authorize('admin'), [
   body('firstName').trim().notEmpty().withMessage('First name is required'),
   body('lastName').trim().notEmpty().withMessage('Last name is required'),
@@ -97,70 +149,35 @@ router.post('/', authenticateToken, authorize('admin'), [
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({
-        message: 'Validation failed',
-        errors: errors.array()
-      });
+      return res.status(400).json({ message: 'Validation failed', errors: errors.array() });
     }
 
-    const { firstName, lastName, email, password, role } = req.body;
+    const { firstName, lastName, email, password, role, source } = req.body;
 
-    // Check if user already exists
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({
-        message: 'User already exists with this email'
-      });
+    const existing = await User.findOne({ email });
+    if (existing) {
+      return res.status(400).json({ message: 'User already exists with this email' });
     }
 
-    // Create new user
-    const user = new User({
-      firstName,
-      lastName,
-      email,
-      password,
-      role
+    const user = await User.create({ firstName, lastName, email, password, role, source: source || null });
+
+    // Auto-create balance and rate for new user
+    await Balance.create({ user: user._id, currentBalance: 0, transactions: [] });
+    await Rate.create({
+      user: user._id,
+      labelRate: 1.00,
+      setBy: req.user._id,
+      notes: `Default rate set by admin`
     });
 
-    await user.save();
-
-    // Send welcome email
-    try {
-      await sendEmail({
-        to: user.email,
-        subject: emailTemplates.userCreated(user.fullName, user.email, password, user.role).subject,
-        html: emailTemplates.userCreated(user.fullName, user.email, password, user.role).html
-      });
-    } catch (emailError) {
-      console.error('Welcome email error:', emailError);
-      // Don't fail user creation if email fails
-    }
-
-    res.status(201).json({
-      message: 'User created successfully',
-      user: {
-        id: user._id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        role: user.role,
-        fullName: user.fullName,
-        isActive: user.isActive,
-        createdAt: user.createdAt
-      }
-    });
-
+    res.status(201).json({ message: 'User created successfully', user });
   } catch (error) {
     console.error('Create user error:', error);
-    res.status(500).json({
-      message: 'Server error creating user'
-    });
+    res.status(500).json({ message: 'Server error creating user' });
   }
 });
 
-// @route   PUT /api/users/:id
-// @desc    Update user
-// @access  Private
+// ── PUT /api/users/:id ────────────────────────────────────────
 router.put('/:id', authenticateToken, [
   body('firstName').optional().trim().notEmpty().withMessage('First name cannot be empty'),
   body('lastName').optional().trim().notEmpty().withMessage('Last name cannot be empty'),
@@ -171,324 +188,86 @@ router.put('/:id', authenticateToken, [
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({
-        message: 'Validation failed',
-        errors: errors.array()
-      });
+      return res.status(400).json({ message: 'Validation failed', errors: errors.array() });
     }
 
-    const user = await User.findById(req.params.id);
-    
-    if (!user) {
-      return res.status(404).json({
-        message: 'User not found'
-      });
+    const isSelf  = req.user._id.toString() === req.params.id;
+    const isAdmin = req.user.role === 'admin';
+    let isResellerClient = false;
+    if (req.user.role === 'reseller') {
+      const me = await User.findById(req.user._id).select('clients');
+      isResellerClient = (me?.clients || []).map(String).includes(req.params.id);
+    }
+    if (!isAdmin && !isSelf && !isResellerClient) {
+      return res.status(403).json({ message: 'Access denied' });
     }
 
-    // Check permissions
-    if (req.user.role !== 'admin' && req.user._id.toString() !== req.params.id) {
-      return res.status(403).json({
-        message: 'Access denied'
-      });
+    // Resellers can change isActive on their clients but NOT role
+    if (!isAdmin && !isSelf) {
+      delete req.body.role;
     }
-
-    // Only admin can change role and isActive
-    if (req.user.role !== 'admin') {
+    // Regular users cannot change their own role or isActive
+    if (!isAdmin && isSelf) {
       delete req.body.role;
       delete req.body.isActive;
     }
 
-    // Check if email is being changed and if it's already taken
-    if (req.body.email && req.body.email !== user.email) {
-      const existingUser = await User.findOne({ email: req.body.email });
-      if (existingUser) {
-        return res.status(400).json({
-          message: 'Email already exists'
-        });
-      }
+    // Check email uniqueness if changing email
+    if (req.body.email) {
+      const existing = await User.findOne({ email: req.body.email, _id: { $ne: req.params.id } });
+      if (existing) return res.status(400).json({ message: 'Email already in use' });
     }
 
-    // Update user
-    const updatedUser = await User.findByIdAndUpdate(
+    const user = await User.findByIdAndUpdate(
       req.params.id,
       { $set: req.body },
       { new: true, runValidators: true }
     ).select('-password');
 
-    res.json({
-      message: 'User updated successfully',
-      user: updatedUser
-    });
+    if (!user) return res.status(404).json({ message: 'User not found' });
 
+    res.json({ message: 'User updated successfully', user });
   } catch (error) {
     console.error('Update user error:', error);
-    res.status(500).json({
-      message: 'Server error updating user'
-    });
+    res.status(500).json({ message: 'Server error updating user' });
   }
 });
 
-// @route   PUT /api/users/:id/password
-// @desc    Update user password
-// @access  Private
-router.put('/:id/password', authenticateToken, [
-  body('currentPassword').notEmpty().withMessage('Current password is required'),
-  body('newPassword').isLength({ min: 6 }).withMessage('New password must be at least 6 characters')
-], async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        message: 'Validation failed',
-        errors: errors.array()
-      });
-    }
-
-    const { currentPassword, newPassword } = req.body;
-    const user = await User.findById(req.params.id).select('+password');
-    
-    if (!user) {
-      return res.status(404).json({
-        message: 'User not found'
-      });
-    }
-
-    // Check permissions
-    if (req.user.role !== 'admin' && req.user._id.toString() !== req.params.id) {
-      return res.status(403).json({
-        message: 'Access denied'
-      });
-    }
-
-    // Verify current password
-    const isMatch = await user.comparePassword(currentPassword);
-    if (!isMatch) {
-      return res.status(400).json({
-        message: 'Current password is incorrect'
-      });
-    }
-
-    // Update password
-    user.password = newPassword;
-    await user.save();
-
-    res.json({
-      message: 'Password updated successfully'
-    });
-
-  } catch (error) {
-    console.error('Update password error:', error);
-    res.status(500).json({
-      message: 'Server error updating password'
-    });
-  }
-});
-
-// @route   PUT /api/users/:id/reset-password
-// @desc    Reset user password (admin only)
-// @access  Private (Admin)
-router.put('/:id/reset-password', authenticateToken, authorize('admin'), [
-  body('newPassword').isLength({ min: 6 }).withMessage('New password must be at least 6 characters')
-], async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        message: 'Validation failed',
-        errors: errors.array()
-      });
-    }
-
-    const { newPassword } = req.body;
-    const user = await User.findById(req.params.id);
-    
-    if (!user) {
-      return res.status(404).json({
-        message: 'User not found'
-      });
-    }
-
-    // Update password
-    user.password = newPassword;
-    await user.save();
-
-    res.json({
-      message: 'Password reset successfully'
-    });
-
-  } catch (error) {
-    console.error('Reset password error:', error);
-    res.status(500).json({
-      message: 'Server error resetting password'
-    });
-  }
-});
-
-// @route   DELETE /api/users/:id
-// @desc    Delete user (admin only)
-// @access  Private (Admin)
+// ── DELETE /api/users/:id ─────────────────────────────────────
 router.delete('/:id', authenticateToken, authorize('admin'), async (req, res) => {
   try {
-    const user = await User.findById(req.params.id);
-    
-    if (!user) {
-      return res.status(404).json({
-        message: 'User not found'
-      });
-    }
-
-    // Prevent admin from deleting themselves
     if (req.user._id.toString() === req.params.id) {
-      return res.status(400).json({
-        message: 'Cannot delete your own account'
-      });
+      return res.status(400).json({ message: 'Cannot delete your own account' });
     }
 
-    await User.findByIdAndDelete(req.params.id);
+    const user = await User.findByIdAndDelete(req.params.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
 
-    res.json({
-      message: 'User deleted successfully'
-    });
+    // Clean up associated balance and rate
+    await Balance.deleteOne({ user: req.params.id });
+    await Rate.deleteMany({ user: req.params.id });
 
+    res.json({ message: 'User deleted successfully' });
   } catch (error) {
     console.error('Delete user error:', error);
-    res.status(500).json({
-      message: 'Server error deleting user'
-    });
+    res.status(500).json({ message: 'Server error deleting user' });
   }
 });
 
-// @route   GET /api/users/:id/clients
-// @desc    Get reseller's clients
-// @access  Private
+// ── GET /api/users/:id/clients ────────────────────────────────
 router.get('/:id/clients', authenticateToken, async (req, res) => {
   try {
-    const user = await User.findById(req.params.id);
-    
-    if (!user) {
-      return res.status(404).json({
-        message: 'User not found'
-      });
-    }
-
-    // Check permissions
     if (req.user.role !== 'admin' && req.user._id.toString() !== req.params.id) {
-      return res.status(403).json({
-        message: 'Access denied'
-      });
+      return res.status(403).json({ message: 'Access denied' });
     }
 
-    // Get clients
-    const clients = await User.find({ _id: { $in: user.clients } })
-      .select('-password')
-      .sort({ firstName: 1 });
+    const user = await User.findById(req.params.id).populate('clients', '-password');
+    if (!user) return res.status(404).json({ message: 'User not found' });
 
-    res.json({ clients });
-
+    res.json({ clients: user.clients });
   } catch (error) {
     console.error('Get clients error:', error);
-    res.status(500).json({
-      message: 'Server error getting clients'
-    });
-  }
-});
-
-// @route   POST /api/users/:id/clients
-// @desc    Add client to reseller
-// @access  Private (Admin)
-router.post('/:id/clients', authenticateToken, authorize('admin'), [
-  body('clientId').isMongoId().withMessage('Valid client ID is required')
-], async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        message: 'Validation failed',
-        errors: errors.array()
-      });
-    }
-
-    const { clientId } = req.body;
-    const reseller = await User.findById(req.params.id);
-    const client = await User.findById(clientId);
-    
-    if (!reseller) {
-      return res.status(404).json({
-        message: 'Reseller not found'
-      });
-    }
-
-    if (!client) {
-      return res.status(404).json({
-        message: 'Client not found'
-      });
-    }
-
-    if (reseller.role !== 'reseller') {
-      return res.status(400).json({
-        message: 'User is not a reseller'
-      });
-    }
-
-    if (client.role === 'admin') {
-      return res.status(400).json({
-        message: 'Cannot assign admin as client'
-      });
-    }
-
-    // Add client if not already added
-    if (!reseller.clients.includes(clientId)) {
-      reseller.clients.push(clientId);
-      await reseller.save();
-    }
-
-    res.json({
-      message: 'Client added successfully',
-      client: {
-        id: client._id,
-        firstName: client.firstName,
-        lastName: client.lastName,
-        email: client.email,
-        fullName: client.fullName
-      }
-    });
-
-  } catch (error) {
-    console.error('Add client error:', error);
-    res.status(500).json({
-      message: 'Server error adding client'
-    });
-  }
-});
-
-// @route   DELETE /api/users/:id/clients/:clientId
-// @desc    Remove client from reseller
-// @access  Private (Admin)
-router.delete('/:id/clients/:clientId', authenticateToken, authorize('admin'), async (req, res) => {
-  try {
-    const reseller = await User.findById(req.params.id);
-    
-    if (!reseller) {
-      return res.status(404).json({
-        message: 'Reseller not found'
-      });
-    }
-
-    reseller.clients = reseller.clients.filter(
-      clientId => clientId.toString() !== req.params.clientId
-    );
-    
-    await reseller.save();
-
-    res.json({
-      message: 'Client removed successfully'
-    });
-
-  } catch (error) {
-    console.error('Remove client error:', error);
-    res.status(500).json({
-      message: 'Server error removing client'
-    });
+    res.status(500).json({ message: 'Server error getting clients' });
   }
 });
 

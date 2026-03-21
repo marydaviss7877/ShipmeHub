@@ -1,432 +1,427 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { useSocket } from '../contexts/SocketContext';
 import axios from 'axios';
 import {
-  DocumentIcon,
-  ClockIcon,
-  CheckCircleIcon,
-  ExclamationTriangleIcon,
-  ArrowUpTrayIcon,
-  ArrowDownTrayIcon,
-  BanknotesIcon,
-  CurrencyDollarIcon,
+  CurrencyDollarIcon, TagIcon, ClipboardDocumentListIcon, CheckCircleIcon,
+  UserGroupIcon, ArrowUpRightIcon, TruckIcon, ClockIcon,
+  ArrowPathIcon, UserPlusIcon, BuildingStorefrontIcon,
 } from '@heroicons/react/24/outline';
 
-interface FileStats {
-  total: number;
-  pending: number;
-  processing: number;
-  completed: number;
-  failed: number;
+// ── Types ─────────────────────────────────────────────────────────────────────
+interface UserStats {
+  balance: { currentBalance: number; totalDeposited: number; totalSpent: number };
+  labels:  { total: number; generated: number; failed: number; spent: number; byCarrier: Record<string, number> };
+  manifests: { total: number; active: number; completed: number; cancelled: number };
+  recentLabels:   any[];
+  activeManifests: any[];
 }
 
-interface RecentFileItem {
-  id: string;
-  originalName: string;
-  fileType: string;
-  status: string;
-  createdAt: string;
-  size: number;
+interface ResellerStats {
+  clientCount:    number;
+  activeClients:  number;
+  myBalance:  { currentBalance: number; totalDeposited: number; totalSpent: number };
+  labels:     { total: number; revenue: number; byCarrier: Record<string, number> };
+  manifests:  { total: number; active: number; completed: number; revenue: number };
+  totalClientSpend: number;
+  recentClients:  any[];
 }
 
-interface Balance {
-  currentBalance: number;
-  totalSpent: number;
-  totalDistributed: number;
-  totalDeposited: number;
-  recentTransactions: Array<{
-    type: string;
-    amount: number;
-    description: string;
-    date: string;
-    performedBy?: {
-      firstName: string;
-      lastName: string;
-    };
-  }>;
-}
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const fmt$ = (v: number) =>
+  `$${(v ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-interface Rate {
-  labelRate: number;
-  currency: string;
-  effectiveFrom: string;
-  notes?: string;
-  setBy?: {
-    firstName: string;
-    lastName: string;
-  };
-}
+const CARRIER_COLORS: Record<string, string> = {
+  USPS: '#1D4ED8', UPS: '#92400E', FedEx: '#5B21B6', DHL: '#B45309',
+};
 
-const Dashboard: React.FC = () => {
-  const { user } = useAuth();
-  const { socket } = useSocket();
-  const [fileStats, setFileStats] = useState<FileStats>({
-    total: 0,
-    pending: 0,
-    processing: 0,
-    completed: 0,
-    failed: 0,
-  });
-  const [recentFiles, setRecentFiles] = useState<RecentFileItem[]>([]);
-  const [balance, setBalance] = useState<Balance | null>(null);
-  const [rate, setRate] = useState<Rate | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+const MANIFEST_STATUS_COLOR: Record<string, string> = {
+  open: '#6366f1', assigned: '#0ea5e9', accepted: '#0ea5e9',
+  uploaded: '#f59e0b', under_review: '#ef4444', completed: '#22c55e',
+  cancelled: '#94a3b8', rejected: '#f97316',
+};
 
-  useEffect(() => {
-    fetchDashboardData();
+const MANIFEST_STATUS_LABEL: Record<string, string> = {
+  open: 'Open', assigned: 'Assigned', accepted: 'Accepted',
+  uploaded: 'Uploaded', under_review: 'Under Review',
+  completed: 'Completed', cancelled: 'Cancelled', rejected: 'Rejected',
+};
+
+// ── Sub-components ────────────────────────────────────────────────────────────
+const MetricCard = ({
+  label, value, sub, color, Icon, onClick,
+}: {
+  label: string; value: string | number; sub?: string;
+  color: string; Icon: React.ElementType; onClick?: () => void;
+}) => (
+  <div
+    onClick={onClick}
+    style={{
+      background: '#fff', border: '1.5px solid var(--navy-150, #e8edf5)',
+      borderRadius: 14, padding: '1.1rem 1.3rem',
+      display: 'flex', flexDirection: 'column', gap: 5,
+      cursor: onClick ? 'pointer' : 'default',
+      position: 'relative', overflow: 'hidden',
+      transition: 'box-shadow 0.15s, transform 0.15s',
+    }}
+    onMouseEnter={e => { if (onClick) { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 18px rgba(0,0,0,0.08)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-1px)'; }}}
+    onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = 'none'; (e.currentTarget as HTMLDivElement).style.transform = 'none'; }}
+  >
+    <div style={{ position: 'absolute', top: 0, left: 0, width: 4, height: '100%', background: color, borderRadius: '14px 0 0 14px' }} />
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--navy-400)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</span>
+      <div style={{ width: 30, height: 30, borderRadius: 8, background: `${color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Icon style={{ width: 15, height: 15, color }} />
+      </div>
+    </div>
+    <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--navy-900)', letterSpacing: '-0.02em', lineHeight: 1 }}>{value}</div>
+    {sub && <div style={{ fontSize: '0.7rem', color: 'var(--navy-400)' }}>{sub}</div>}
+  </div>
+);
+
+const QuickAction = ({ label, sub, Icon, color, onClick }: { label: string; sub: string; Icon: React.ElementType; color: string; onClick: () => void }) => (
+  <button
+    onClick={onClick}
+    style={{
+      display: 'flex', alignItems: 'center', gap: 10,
+      padding: '0.7rem 0.9rem', borderRadius: 10,
+      border: '1.5px solid var(--navy-100)',
+      background: '#fff', cursor: 'pointer', textAlign: 'left', width: '100%',
+      transition: 'all 0.12s',
+    }}
+    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = color; (e.currentTarget as HTMLButtonElement).style.background = `${color}08`; }}
+    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--navy-100)'; (e.currentTarget as HTMLButtonElement).style.background = '#fff'; }}
+  >
+    <div style={{ width: 34, height: 34, borderRadius: 9, background: `${color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+      <Icon style={{ width: 16, height: 16, color }} />
+    </div>
+    <div>
+      <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--navy-800)' }}>{label}</div>
+      <div style={{ fontSize: '0.7rem', color: 'var(--navy-400)' }}>{sub}</div>
+    </div>
+  </button>
+);
+
+// ── User Dashboard ─────────────────────────────────────────────────────────────
+const UserDashboard: React.FC<{ firstName: string }> = ({ firstName }) => {
+  const navigate = useNavigate();
+  const [stats, setStats]     = useState<UserStats | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await axios.get('/stats');
+      setStats(res.data);
+    } catch (err) { console.error(err); }
+    finally { setLoading(false); }
   }, []);
 
-  useEffect(() => {
-    if (socket) {
-      socket.on('file-uploaded', (data) => {
-        console.log('File uploaded:', data);
-        fetchDashboardData();
-      });
+  useEffect(() => { load(); }, [load]);
 
-      socket.on('file-completed', (data) => {
-        console.log('File completed:', data);
-        fetchDashboardData();
-      });
+  if (loading) return <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem' }}><div className="spinner" /></div>;
+  if (!stats)  return null;
 
-      return () => {
-        socket.off('file-uploaded');
-        socket.off('file-completed');
-      };
-    }
-  }, [socket]);
-
-  const fetchDashboardData = async () => {
-    try {
-      const [statsResponse, filesResponse, balanceResponse, rateResponse] = await Promise.all([
-        axios.get('/files?limit=0'),
-        axios.get('/files?limit=5'),
-        axios.get('/balance').catch(() => ({ data: null })),
-        axios.get('/rates').catch(() => ({ data: null })),
-      ]);
-
-      const files = filesResponse.data.files;
-      const stats = {
-        total: files.length,
-        pending: files.filter((f: any) => f.status === 'pending').length,
-        processing: files.filter((f: any) => f.status === 'processing').length,
-        completed: files.filter((f: any) => f.status === 'completed').length,
-        failed: files.filter((f: any) => f.status === 'failed').length,
-      };
-
-      setFileStats(stats);
-      setRecentFiles(files);
-      setBalance(balanceResponse.data);
-      setRate(rateResponse.data);
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return <CheckCircleIcon className="h-5 w-5 text-green-500" />;
-      case 'processing':
-        return <ClockIcon className="h-5 w-5 text-yellow-500" />;
-      case 'failed':
-        return <ExclamationTriangleIcon className="h-5 w-5 text-red-500" />;
-      default:
-        return <ClockIcon className="h-5 w-5 text-gray-500" />;
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return 'bg-green-100 text-green-800';
-      case 'processing':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'failed':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-      </div>
-    );
-  }
+  const { balance, labels, manifests, recentLabels, activeManifests } = stats;
+  const totalLabels = labels.total || 1;
+  const now = new Date();
+  const greeting = now.getHours() < 12 ? 'Good morning' : now.getHours() < 17 ? 'Good afternoon' : 'Good evening';
 
   return (
-    <div className="space-y-6">
-      {/* Welcome Section */}
-      <div className="bg-white overflow-hidden shadow rounded-lg">
-        <div className="px-4 py-5 sm:p-6">
-          <h1 className="text-2xl font-bold text-gray-900">
-            Welcome back, {user?.firstName}!
-          </h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Here's what's happening with your USPS labels today.
-          </p>
-        </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
+
+      {/* Header */}
+      <div>
+        <h1 className="page-title">{greeting}, {firstName}!</h1>
+        <p className="page-subtitle">Here's your shipping activity overview.</p>
       </div>
 
-      {/* Balance Overview */}
-      <div className="bg-white overflow-hidden shadow rounded-lg">
-        <div className="px-4 py-5 sm:p-6">
-          <h3 className="text-lg leading-6 font-medium text-gray-900 mb-6">Balance Overview</h3>
-          
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {/* Current Balance */}
-            <div className="text-center">
-              <div className="text-3xl font-bold text-green-600 mb-2">
-                ${balance?.currentBalance?.toFixed(1) || '222.5'}
-              </div>
-              <div className="text-sm font-medium text-gray-900 mb-1">BALANCE</div>
-              <div className="text-xs text-gray-500">Your remaining balance to use</div>
-            </div>
-
-            {/* Total Spent */}
-            <div className="text-center">
-              <div className="text-3xl font-bold text-red-600 mb-2">
-                ${balance?.totalSpent?.toFixed(0) || '0'}
-              </div>
-              <div className="text-sm font-medium text-gray-900 mb-1">TOTAL SPENT</div>
-              <div className="text-xs text-gray-500">Total balance you have spent</div>
-            </div>
-
-            {/* Total Distributed */}
-            <div className="text-center">
-              <div className="text-3xl font-bold text-blue-600 mb-2">
-                ${balance?.totalDistributed?.toFixed(1) || '9477.5'}
-              </div>
-              <div className="text-sm font-medium text-gray-900 mb-1">TOTAL DISTRIBUTED</div>
-              <div className="text-xs text-gray-500">Balance you have distributed</div>
-            </div>
-
-            {/* Total Deposited */}
-            <div className="text-center">
-              <div className="text-3xl font-bold text-purple-600 mb-2">
-                ${balance?.totalDeposited?.toFixed(0) || '9700'}
-              </div>
-              <div className="text-sm font-medium text-gray-900 mb-1">TOTAL DEPOSITED</div>
-              <div className="text-xs text-gray-500">Total balance you have deposited</div>
-            </div>
-          </div>
-        </div>
+      {/* KPI Row */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(165px, 1fr))', gap: '0.875rem' }}>
+        <MetricCard label="Balance"         value={fmt$(balance.currentBalance)} sub={`${fmt$(balance.totalDeposited)} deposited`} color="#22c55e" Icon={CurrencyDollarIcon} onClick={() => navigate('/profile')} />
+        <MetricCard label="Labels Generated" value={labels.generated}            sub={`${labels.failed} failed`}                   color="#0ea5e9" Icon={TagIcon}             onClick={() => navigate('/labels/history')} />
+        <MetricCard label="Active Manifests" value={manifests.active}            sub={`${manifests.completed} completed`}          color="#f59e0b" Icon={ClipboardDocumentListIcon} />
+        <MetricCard label="Total Spent"      value={fmt$(balance.totalSpent)}    sub="Labels + manifests"                          color="#6366f1" Icon={CurrencyDollarIcon} />
       </div>
 
-      {/* Rate Card */}
-      <div className="bg-white overflow-hidden shadow rounded-lg">
-        <div className="p-5">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <CurrencyDollarIcon className="h-6 w-6 text-blue-400" />
-            </div>
-            <div className="ml-5 w-0 flex-1">
-              <dl>
-                <dt className="text-sm font-medium text-gray-500 truncate">
-                  Label Rate
-                </dt>
-                <dd className="text-2xl font-bold text-gray-900">
-                  ${rate?.labelRate?.toFixed(2) || '0.00'} per label
-                </dd>
-              </dl>
-            </div>
+      {/* Mid row — carrier breakdown + active jobs */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+
+        {/* Labels by Carrier */}
+        <div className="sh-card" style={{ padding: '1.2rem 1.4rem' }}>
+          <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--navy-900)', marginBottom: '1rem' }}>Labels by Carrier</h3>
+          {['USPS','UPS','FedEx','DHL'].map(c => {
+            const count = labels.byCarrier[c] || 0;
+            const pct   = Math.round((count / totalLabels) * 100);
+            return (
+              <div key={c} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                <span style={{ width: 48, fontSize: '0.75rem', fontWeight: 700, color: 'var(--navy-600)' }}>{c}</span>
+                <div style={{ flex: 1, height: 7, background: 'var(--navy-100)', borderRadius: 99, overflow: 'hidden' }}>
+                  <div style={{ width: `${pct}%`, height: '100%', background: CARRIER_COLORS[c], borderRadius: 99 }} />
+                </div>
+                <span style={{ width: 28, fontSize: '0.75rem', fontWeight: 700, color: 'var(--navy-700)', textAlign: 'right' }}>{count}</span>
+              </div>
+            );
+          })}
+          <div style={{ paddingTop: '0.75rem', borderTop: '1px solid var(--navy-100)', display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: '0.78rem', color: 'var(--navy-500)' }}>Total Labels</span>
+            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--navy-700)' }}>{labels.total}</span>
           </div>
-          {rate?.notes && (
-            <div className="mt-4">
-              <p className="text-xs text-gray-500">{rate.notes}</p>
+        </div>
+
+        {/* Active Manifest Jobs */}
+        <div className="sh-card" style={{ padding: '1.2rem 1.4rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.875rem' }}>
+            <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--navy-900)' }}>Active Manifest Jobs</h3>
+            <button className="btn btn-ghost btn-sm" style={{ fontSize: '0.72rem' }} onClick={() => navigate('/labels/bulk')}>
+              Submit Job →
+            </button>
+          </div>
+          {activeManifests.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '1.5rem 0', color: 'var(--navy-400)', fontSize: '0.82rem' }}>
+              No active jobs. <button onClick={() => navigate('/labels/bulk')} style={{ background: 'none', border: 'none', color: 'var(--accent-600)', cursor: 'pointer', fontWeight: 600 }}>Submit one →</button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {activeManifests.map((job: any) => (
+                <div key={job._id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.6rem 0.75rem', background: 'var(--navy-50, #f8fafc)', borderRadius: 9, cursor: 'pointer' }} onClick={() => navigate('/labels/bulk')}>
+                  <span className={`carrier-badge ${job.carrier?.toLowerCase()}`} style={{ flexShrink: 0 }}>{job.carrier}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--navy-800)' }}>{job.userBilling?.labelCount ?? '?'} labels</div>
+                    <div style={{ fontSize: '0.68rem', color: 'var(--navy-400)' }}>{job.assignedVendor?.name ?? 'Unassigned'}</div>
+                  </div>
+                  <span style={{
+                    fontSize: '0.68rem', fontWeight: 700, padding: '2px 7px', borderRadius: 99,
+                    background: `${MANIFEST_STATUS_COLOR[job.status] || '#94a3b8'}18`,
+                    color: MANIFEST_STATUS_COLOR[job.status] || '#64748b',
+                  }}>{MANIFEST_STATUS_LABEL[job.status] || job.status}</span>
+                </div>
+              ))}
             </div>
           )}
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <DocumentIcon className="h-6 w-6 text-gray-400" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Total Files
-                  </dt>
-                  <dd className="text-lg font-medium text-gray-900">{fileStats.total}</dd>
-                </dl>
-              </div>
-            </div>
-          </div>
+      {/* Recent Labels */}
+      <div className="sh-card">
+        <div style={{ padding: '1.1rem 1.5rem', borderBottom: '1px solid var(--navy-100)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--navy-900)' }}>Recent Labels</h3>
+          <button className="btn btn-ghost btn-sm" style={{ fontSize: '0.72rem' }} onClick={() => navigate('/labels/history')}>
+            View all →
+          </button>
         </div>
-
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <ClockIcon className="h-6 w-6 text-yellow-400" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Pending
-                  </dt>
-                  <dd className="text-lg font-medium text-gray-900">{fileStats.pending}</dd>
-                </dl>
-              </div>
-            </div>
+        {recentLabels.length === 0 ? (
+          <div className="empty-state">
+            <TagIcon style={{ width: 36, height: 36 }} />
+            <h3>No labels yet</h3>
+            <p>Generate your first label to see it here.</p>
           </div>
-        </div>
-
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <CheckCircleIcon className="h-6 w-6 text-green-400" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Completed
-                  </dt>
-                  <dd className="text-lg font-medium text-gray-900">{fileStats.completed}</dd>
-                </dl>
-              </div>
-            </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="sh-table">
+              <thead><tr><th>Carrier</th><th>Tracking</th><th>Type</th><th>Cost</th><th>Date</th><th>Status</th></tr></thead>
+              <tbody>
+                {recentLabels.map((lbl: any) => (
+                  <tr key={lbl._id}>
+                    <td><span className={`carrier-badge ${lbl.carrier?.toLowerCase()}`}>{lbl.carrier || '—'}</span></td>
+                    <td style={{ fontFamily: 'monospace', fontSize: '0.75rem', color: 'var(--navy-600)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {lbl.trackingId || '—'}
+                    </td>
+                    <td><span style={{ fontSize: '0.72rem', color: 'var(--navy-500)' }}>{lbl.isBulk ? 'Bulk' : 'Single'}</span></td>
+                    <td style={{ fontWeight: 600, color: lbl.price > 0 ? '#ef4444' : 'var(--navy-400)' }}>{lbl.price > 0 ? fmt$(lbl.price) : '—'}</td>
+                    <td style={{ fontSize: '0.78rem', color: 'var(--navy-500)', whiteSpace: 'nowrap' }}>{new Date(lbl.createdAt).toLocaleDateString()}</td>
+                    <td>
+                      <span style={{
+                        fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 99,
+                        background: lbl.status === 'generated' ? '#f0fdf4' : '#fef2f2',
+                        color:      lbl.status === 'generated' ? '#16a34a'  : '#dc2626',
+                      }}>{lbl.status}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </div>
-
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <ExclamationTriangleIcon className="h-6 w-6 text-red-400" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Failed
-                  </dt>
-                  <dd className="text-lg font-medium text-gray-900">{fileStats.failed}</dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Quick Actions */}
-      <div className="bg-white shadow rounded-lg">
-        <div className="px-4 py-5 sm:p-6">
-          <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
-            Quick Actions
-          </h3>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <a
-              href="/files"
-              className="relative group bg-white p-6 focus-within:ring-2 focus-within:ring-inset focus-within:ring-primary-500 rounded-lg border border-gray-300 hover:border-gray-400"
-            >
-              <div>
-                <span className="rounded-lg inline-flex p-3 bg-primary-50 text-primary-700 ring-4 ring-white">
-                  <ArrowUpTrayIcon className="h-6 w-6" />
-                </span>
-              </div>
-              <div className="mt-8">
-                <h3 className="text-lg font-medium">
-                  <span className="absolute inset-0" aria-hidden="true" />
-                  Upload Files
-                </h3>
-                <p className="mt-2 text-sm text-gray-500">
-                  Upload your bulk label request files for processing.
-                </p>
-              </div>
-            </a>
-
-            <a
-              href="/files"
-              className="relative group bg-white p-6 focus-within:ring-2 focus-within:ring-inset focus-within:ring-primary-500 rounded-lg border border-gray-300 hover:border-gray-400"
-            >
-              <div>
-                <span className="rounded-lg inline-flex p-3 bg-green-50 text-green-700 ring-4 ring-white">
-                  <ArrowDownTrayIcon className="h-6 w-6" />
-                </span>
-              </div>
-              <div className="mt-8">
-                <h3 className="text-lg font-medium">
-                  <span className="absolute inset-0" aria-hidden="true" />
-                  Download Labels
-                </h3>
-                <p className="mt-2 text-sm text-gray-500">
-                  Download your completed USPS labels.
-                </p>
-              </div>
-            </a>
-          </div>
-        </div>
-      </div>
-
-      {/* Recent Files */}
-      <div className="bg-white shadow rounded-lg">
-        <div className="px-4 py-5 sm:p-6">
-          <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
-            Recent Files
-          </h3>
-          {recentFiles.length === 0 ? (
-            <div className="text-center py-6">
-              <DocumentIcon className="mx-auto h-12 w-12 text-gray-400" />
-              <h3 className="mt-2 text-sm font-medium text-gray-900">No files</h3>
-              <p className="mt-1 text-sm text-gray-500">
-                Get started by uploading your first file.
-              </p>
-            </div>
-          ) : (
-            <div className="flow-root">
-              <ul className="-my-5 divide-y divide-gray-200">
-                {recentFiles.map((file) => (
-                  <li key={file.id} className="py-4">
-                    <div className="flex items-center space-x-4">
-                      <div className="flex-shrink-0">
-                        {getStatusIcon(file.status)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">
-                          {file.originalName}
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          {file.fileType.replace('_', ' ')} • {formatFileSize(file.size)}
-                        </p>
-                      </div>
-                      <div className="flex-shrink-0">
-                        <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
-                            file.status
-                          )}`}
-                        >
-                          {file.status}
-                        </span>
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+      <div className="sh-card" style={{ padding: '1.25rem 1.5rem' }}>
+        <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--navy-900)', marginBottom: '0.875rem' }}>Quick Actions</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
+          <QuickAction label="Single Label"    sub="Generate one label now"       Icon={TagIcon}                   color="#0ea5e9" onClick={() => navigate('/labels/single')} />
+          <QuickAction label="Bulk Labels"     sub="Upload CSV, generate many"    Icon={ClipboardDocumentListIcon} color="#6366f1" onClick={() => navigate('/labels/bulk')} />
+          <QuickAction label="Label History"    sub="View all generated labels"   Icon={ClockIcon}                 color="#f59e0b" onClick={() => navigate('/labels/history')} />
+          <QuickAction label="View Carriers"   sub="Browse available services"   Icon={TruckIcon}                 color="#22c55e" onClick={() => navigate('/carriers')} />
         </div>
       </div>
     </div>
   );
+};
+
+// ── Reseller Dashboard ────────────────────────────────────────────────────────
+const ResellerDashboard: React.FC<{ firstName: string }> = ({ firstName }) => {
+  const navigate = useNavigate();
+  const [stats, setStats]     = useState<ResellerStats | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await axios.get('/stats');
+      setStats(res.data);
+    } catch (err) { console.error(err); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem' }}><div className="spinner" /></div>;
+  if (!stats)  return null;
+
+  const { myBalance, labels, manifests, recentClients, clientCount, activeClients, totalClientSpend } = stats;
+  const totalLabels = labels.total || 1;
+  const now = new Date();
+  const greeting = now.getHours() < 12 ? 'Good morning' : now.getHours() < 17 ? 'Good afternoon' : 'Good evening';
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
+
+      {/* Header */}
+      <div>
+        <h1 className="page-title">{greeting}, {firstName}!</h1>
+        <p className="page-subtitle">Your reseller account overview.</p>
+      </div>
+
+      {/* KPI Row */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(165px, 1fr))', gap: '0.875rem' }}>
+        <MetricCard label="My Balance"       value={fmt$(myBalance.currentBalance)} sub={`${fmt$(myBalance.totalDeposited)} deposited`} color="#22c55e" Icon={CurrencyDollarIcon} onClick={() => navigate('/profile')} />
+        <MetricCard label="Total Clients"    value={clientCount}                    sub={`${activeClients} active`}                    color="#6366f1" Icon={UserGroupIcon}       onClick={() => navigate('/reseller/clients')} />
+        <MetricCard label="Client Labels"    value={labels.total}                   sub="Generated by clients"                         color="#0ea5e9" Icon={TagIcon} />
+        <MetricCard label="Client Spend"     value={fmt$(totalClientSpend)}         sub="Labels + manifest jobs"                       color="#f59e0b" Icon={CurrencyDollarIcon} />
+      </div>
+
+      {/* Mid row */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+
+        {/* My Balance */}
+        <div className="sh-card" style={{ padding: '1.2rem 1.4rem' }}>
+          <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--navy-900)', marginBottom: '1rem' }}>My Balance</h3>
+          {[
+            { label: 'Available Balance', val: fmt$(myBalance.currentBalance), color: '#22c55e' },
+            { label: 'Total Deposited',   val: fmt$(myBalance.totalDeposited), color: '#6366f1' },
+            { label: 'Total Spent',       val: fmt$(myBalance.totalSpent),     color: '#ef4444' },
+          ].map(({ label, val, color }) => (
+            <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.6rem 0', borderBottom: '1px solid var(--navy-50, #f8fafc)' }}>
+              <span style={{ fontSize: '0.82rem', color: 'var(--navy-500)' }}>{label}</span>
+              <span style={{ fontSize: '0.88rem', fontWeight: 700, color }}>{val}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Client Activity */}
+        <div className="sh-card" style={{ padding: '1.2rem 1.4rem' }}>
+          <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--navy-900)', marginBottom: '1rem' }}>Client Activity</h3>
+          {/* Labels by carrier */}
+          {['USPS','UPS','FedEx','DHL'].map(c => {
+            const count = labels.byCarrier?.[c] || 0;
+            const pct   = Math.round((count / totalLabels) * 100);
+            return (
+              <div key={c} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                <span style={{ width: 48, fontSize: '0.73rem', fontWeight: 700, color: 'var(--navy-600)' }}>{c}</span>
+                <div style={{ flex: 1, height: 6, background: 'var(--navy-100)', borderRadius: 99, overflow: 'hidden' }}>
+                  <div style={{ width: `${pct}%`, height: '100%', background: CARRIER_COLORS[c], borderRadius: 99 }} />
+                </div>
+                <span style={{ width: 24, fontSize: '0.73rem', fontWeight: 700, color: 'var(--navy-700)', textAlign: 'right' }}>{count}</span>
+              </div>
+            );
+          })}
+          <div style={{ paddingTop: '0.75rem', borderTop: '1px solid var(--navy-100)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+            {[
+              { label: 'Active Jobs',    val: manifests.active,    color: '#f59e0b' },
+              { label: 'Completed Jobs', val: manifests.completed, color: '#22c55e' },
+              { label: 'Total Manifests',val: manifests.total,     color: 'var(--navy-700)' },
+              { label: 'Manifest Revenue', val: fmt$(manifests.revenue), color: '#6366f1' },
+            ].map(({ label, val, color }) => (
+              <div key={label} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '0.72rem', color: 'var(--navy-500)' }}>{label}</span>
+                <span style={{ fontSize: '0.72rem', fontWeight: 700, color }}>{val}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Recent Clients */}
+      <div className="sh-card">
+        <div style={{ padding: '1.1rem 1.5rem', borderBottom: '1px solid var(--navy-100)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <UserGroupIcon style={{ width: 15, height: 15, color: '#6366f1' }} />
+            <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--navy-900)' }}>My Clients</h3>
+          </div>
+          <button className="btn btn-ghost btn-sm" style={{ fontSize: '0.72rem' }} onClick={() => navigate('/reseller/clients')}>
+            Manage clients →
+          </button>
+        </div>
+        {recentClients.length === 0 ? (
+          <div className="empty-state">
+            <UserGroupIcon style={{ width: 36, height: 36 }} />
+            <h3>No clients yet</h3>
+            <p>Add your first client from the Clients page.</p>
+          </div>
+        ) : (
+          <div>
+            {recentClients.map((c: any) => (
+              <div key={c._id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '0.75rem 1.5rem', borderBottom: '1px solid var(--navy-50, #f8fafc)' }}>
+                <div className="avatar avatar-sm avatar-indigo" style={{ fontSize: '0.65rem', flexShrink: 0 }}>
+                  {c.firstName?.charAt(0)}{c.lastName?.charAt(0)}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--navy-800)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {c.firstName} {c.lastName}
+                  </div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--navy-400)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.email}</div>
+                </div>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: c.isActive ? '#22c55e' : '#94a3b8', flexShrink: 0 }} />
+                <span style={{ fontSize: '0.7rem', color: 'var(--navy-400)', whiteSpace: 'nowrap' }}>
+                  {new Date(c.createdAt).toLocaleDateString()}
+                </span>
+                <button
+                  onClick={() => navigate('/reseller/clients')}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-500)', padding: 4 }}
+                >
+                  <ArrowUpRightIcon style={{ width: 14, height: 14 }} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Quick Actions */}
+      <div className="sh-card" style={{ padding: '1.25rem 1.5rem' }}>
+        <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--navy-900)', marginBottom: '0.875rem' }}>Quick Actions</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
+          <QuickAction label="Manage Clients"  sub="Add or manage your clients" Icon={UserGroupIcon}          color="#6366f1" onClick={() => navigate('/reseller/clients')} />
+          <QuickAction label="Single Label"    sub="Generate a label for client" Icon={TagIcon}              color="#0ea5e9" onClick={() => navigate('/labels/single')} />
+          <QuickAction label="Bulk Labels"     sub="Upload CSV for many labels"  Icon={ClipboardDocumentListIcon} color="#f59e0b" onClick={() => navigate('/labels/bulk')} />
+          <QuickAction label="View Carriers"   sub="Browse available services"  Icon={TruckIcon}             color="#22c55e" onClick={() => navigate('/carriers')} />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── Dashboard (role router) ────────────────────────────────────────────────────
+const Dashboard: React.FC = () => {
+  const { user } = useAuth();
+
+  if (!user) return null;
+
+  // Admin goes to /admin
+  if (user.role === 'admin') return <Navigate to="/admin" replace />;
+
+  if (user.role === 'reseller') return <ResellerDashboard firstName={user.firstName ?? ''} />;
+
+  return <UserDashboard firstName={user.firstName ?? ''} />;
 };
 
 export default Dashboard;
