@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
-import { KeyIcon, EyeIcon, EyeSlashIcon, CheckCircleIcon, ExclamationCircleIcon } from '@heroicons/react/24/outline';
+import { KeyIcon, EyeIcon, EyeSlashIcon, CheckCircleIcon, ExclamationCircleIcon, BellIcon, BellSlashIcon } from '@heroicons/react/24/outline';
 
 const Profile: React.FC = () => {
   const { user, updateUser } = useAuth();
   const [isEditing,          setIsEditing]          = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [notifSaving,        setNotifSaving]        = useState(false);
+  const [notifMsg,           setNotifMsg]           = useState('');
   const [showCurrentPw,      setShowCurrentPw]      = useState(false);
   const [showNewPw,          setShowNewPw]           = useState(false);
   const [showConfirmPw,      setShowConfirmPw]       = useState(false);
@@ -51,6 +53,17 @@ const Profile: React.FC = () => {
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to update password');
     } finally { setIsLoading(false); }
+  };
+
+  const handleToggleEmailNotif = async () => {
+    setNotifSaving(true); setNotifMsg('');
+    try {
+      const res = await axios.put(`/users/${user?.id}`, { emailNotifications: !(user as any)?.emailNotifications });
+      updateUser(res.data.user);
+      setNotifMsg('Preference saved.');
+      setTimeout(() => setNotifMsg(''), 2500);
+    } catch { setNotifMsg('Failed to save.'); }
+    finally { setNotifSaving(false); }
   };
 
   const initials = `${user?.firstName?.charAt(0) ?? ''}${user?.lastName?.charAt(0) ?? ''}`;
@@ -141,6 +154,68 @@ const Profile: React.FC = () => {
                 </div>
               ))}
             </div>
+          )}
+        </div>
+      </div>
+
+      {/* Notification Preferences card */}
+      <div className="sh-card">
+        <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--navy-100)' }}>
+          <h2 style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--navy-900)' }}>Notification Preferences</h2>
+          <p style={{ fontSize: '0.78rem', color: 'var(--navy-400)', marginTop: 3 }}>Choose which notifications you receive by email.</p>
+        </div>
+        <div style={{ padding: '1.25rem 1.5rem' }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '0.875rem 1rem', borderRadius: 10,
+            border: '1.5px solid var(--navy-150, #e8edf5)', background: 'var(--navy-50)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{
+                width: 36, height: 36, borderRadius: 9, flexShrink: 0,
+                background: (user as any)?.emailNotifications !== false ? '#EFF6FF' : 'var(--navy-100)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                {(user as any)?.emailNotifications !== false
+                  ? <BellIcon style={{ width: 17, height: 17, color: '#2563EB' }} />
+                  : <BellSlashIcon style={{ width: 17, height: 17, color: 'var(--navy-400)' }} />
+                }
+              </div>
+              <div>
+                <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--navy-900)' }}>Announcement emails</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--navy-500)', marginTop: 1 }}>
+                  Receive an email when new announcements are published on the platform.
+                </div>
+              </div>
+            </div>
+
+            {/* Toggle */}
+            <button
+              onClick={handleToggleEmailNotif}
+              disabled={notifSaving}
+              title={(user as any)?.emailNotifications !== false ? 'Turn off' : 'Turn on'}
+              style={{
+                width: 44, height: 24, borderRadius: 99, border: 'none',
+                background: (user as any)?.emailNotifications !== false ? '#2563EB' : 'var(--navy-200)',
+                position: 'relative', cursor: notifSaving ? 'not-allowed' : 'pointer',
+                transition: 'background 0.2s', flexShrink: 0,
+                opacity: notifSaving ? 0.6 : 1,
+              }}
+            >
+              <div style={{
+                position: 'absolute', top: 3,
+                left: (user as any)?.emailNotifications !== false ? 22 : 3,
+                width: 18, height: 18, borderRadius: '50%', background: '#fff',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                transition: 'left 0.2s',
+              }} />
+            </button>
+          </div>
+
+          {notifMsg && (
+            <p style={{ fontSize: '0.78rem', color: notifMsg === 'Preference saved.' ? '#16A34A' : '#DC2626', marginTop: 8, fontWeight: 500 }}>
+              {notifMsg}
+            </p>
           )}
         </div>
       </div>

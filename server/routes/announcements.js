@@ -1,6 +1,8 @@
 const express      = require('express');
 const Announcement = require('../models/Announcement');
+const User         = require('../models/User');
 const { authenticateToken, authorize } = require('../middleware/auth');
+const { sendEmail, announcementNotification } = require('../services/emailService');
 
 const router = express.Router();
 
@@ -44,6 +46,16 @@ router.post('/', authenticateToken, authorize('admin'), async (req, res) => {
       isPinned:  !!isPinned,
       createdBy: req.user._id,
     });
+
+    // Send email to opted-in users (fire-and-forget)
+    const portalUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+    User.find({ isActive: true, emailNotifications: true }).select('firstName email').then(users => {
+      users.forEach(u => {
+        const tpl = announcementNotification(u.firstName, a.title, a.content, a.category, portalUrl);
+        sendEmail({ to: u.email, ...tpl });
+      });
+    }).catch(() => {});
+
     res.status(201).json({ announcement: a });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });

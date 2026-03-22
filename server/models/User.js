@@ -57,6 +57,11 @@ const userSchema = new mongoose.Schema({
     type: String,
     enum: ['Organic', 'Paid Ads', null],
     default: null,
+  },
+  // Notification preferences
+  emailNotifications: {
+    type: Boolean,
+    default: true,
   }
 }, {
   timestamps: true

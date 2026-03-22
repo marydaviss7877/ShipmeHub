@@ -4,119 +4,8 @@ import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
 import {
   CurrencyDollarIcon, TagIcon, ClipboardDocumentListIcon,
-  UserGroupIcon, ArrowUpRightIcon, ClockIcon, MegaphoneIcon,
+  UserGroupIcon, ArrowUpRightIcon, ClockIcon,
 } from '@heroicons/react/24/outline';
-import { MapPinIcon as MapPinSolid } from '@heroicons/react/24/solid';
-
-// ── Announcement types ────────────────────────────────────────────────────────
-interface Announcement {
-  _id: string;
-  title: string;
-  content: string;
-  category: 'general' | 'service' | 'pricing' | 'maintenance';
-  isPinned: boolean;
-  createdAt: string;
-}
-
-const CATEGORY_COLOR: Record<string, { bg: string; color: string; border: string }> = {
-  general:     { bg: '#EFF6FF', color: '#1D4ED8', border: '#BFDBFE' },
-  service:     { bg: '#F0FDF4', color: '#16A34A', border: '#BBF7D0' },
-  pricing:     { bg: '#FFFBEB', color: '#D97706', border: '#FDE68A' },
-  maintenance: { bg: '#FEF2F2', color: '#DC2626', border: '#FECACA' },
-};
-
-const API = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
-
-// ── Announcements widget ──────────────────────────────────────────────────────
-const AnnouncementsWidget: React.FC = () => {
-  const navigate = useNavigate();
-  const [items, setItems] = useState<Announcement[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    axios.get(`${API}/announcements`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(res => setItems(res.data.announcements.slice(0, 3)))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
-
-  return (
-    <div className="sh-card">
-      <div style={{ padding: '1.1rem 1.5rem', borderBottom: '1px solid var(--navy-100)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <MegaphoneIcon style={{ width: 15, height: 15, color: '#6366f1' }} />
-          <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--navy-900)' }}>Announcements</h3>
-        </div>
-        <button className="btn btn-ghost btn-sm" style={{ fontSize: '0.72rem' }} onClick={() => navigate('/announcements')}>
-          View all →
-        </button>
-      </div>
-
-      {loading ? (
-        <div style={{ padding: '1.5rem', display: 'flex', justifyContent: 'center' }}>
-          <div className="spinner" />
-        </div>
-      ) : items.length === 0 ? (
-        <div className="empty-state" style={{ padding: '2rem' }}>
-          <MegaphoneIcon style={{ width: 32, height: 32 }} />
-          <p style={{ marginTop: 8, fontSize: '0.82rem' }}>No announcements at this time.</p>
-        </div>
-      ) : (
-        <div>
-          {items.map((item, i) => {
-            const cat = CATEGORY_COLOR[item.category] ?? CATEGORY_COLOR.general;
-            return (
-              <div
-                key={item._id}
-                style={{
-                  padding: '0.85rem 1.5rem',
-                  borderBottom: i < items.length - 1 ? '1px solid var(--navy-50)' : 'none',
-                  display: 'flex', gap: 12, alignItems: 'flex-start',
-                  cursor: 'pointer',
-                }}
-                onClick={() => navigate('/announcements')}
-                onMouseEnter={e => (e.currentTarget.style.background = 'var(--navy-50)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-              >
-                {/* Left accent */}
-                <div style={{
-                  width: 3, borderRadius: 99, flexShrink: 0, alignSelf: 'stretch',
-                  background: item.isPinned ? '#3B82F6' : cat.color,
-                  minHeight: 36,
-                }} />
-
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 3 }}>
-                    {item.isPinned && (
-                      <MapPinSolid style={{ width: 11, height: 11, color: '#2563EB', flexShrink: 0 }} />
-                    )}
-                    <span style={{
-                      fontSize: '0.67rem', fontWeight: 700, letterSpacing: '0.05em',
-                      textTransform: 'uppercase', padding: '1px 7px', borderRadius: 99,
-                      background: cat.bg, color: cat.color, border: `1px solid ${cat.border}`,
-                    }}>
-                      {item.category}
-                    </span>
-                    <span style={{ fontSize: '0.68rem', color: 'var(--navy-400)', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
-                      {new Date(item.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: '0.83rem', fontWeight: 600, color: 'var(--navy-800)', marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {item.title}
-                  </div>
-                  <div style={{ fontSize: '0.76rem', color: 'var(--navy-500)', lineHeight: 1.45, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                    {item.content}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-};
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface UserStats {
@@ -354,17 +243,13 @@ const UserDashboard: React.FC<{ firstName: string }> = ({ firstName }) => {
         )}
       </div>
 
-      {/* Bottom row — Announcements + Quick Actions */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-        <AnnouncementsWidget />
-
-        <div className="sh-card" style={{ padding: '1.25rem 1.5rem' }}>
-          <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--navy-900)', marginBottom: '0.875rem' }}>Quick Actions</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <QuickAction label="Single Label"  sub="Generate one label now"     Icon={TagIcon}                   color="#0ea5e9" onClick={() => navigate('/labels/single')} />
-            <QuickAction label="Bulk Labels"   sub="Upload CSV, generate many"  Icon={ClipboardDocumentListIcon} color="#6366f1" onClick={() => navigate('/labels/bulk')} />
-            <QuickAction label="Label History" sub="View all generated labels"  Icon={ClockIcon}                 color="#f59e0b" onClick={() => navigate('/labels/history')} />
-          </div>
+      {/* Quick Actions */}
+      <div className="sh-card" style={{ padding: '1.25rem 1.5rem' }}>
+        <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--navy-900)', marginBottom: '0.875rem' }}>Quick Actions</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
+          <QuickAction label="Single Label"  sub="Generate one label now"    Icon={TagIcon}                   color="#0ea5e9" onClick={() => navigate('/labels/single')} />
+          <QuickAction label="Bulk Labels"   sub="Upload CSV, generate many" Icon={ClipboardDocumentListIcon} color="#6366f1" onClick={() => navigate('/labels/bulk')} />
+          <QuickAction label="Label History" sub="View all generated labels" Icon={ClockIcon}                 color="#f59e0b" onClick={() => navigate('/labels/history')} />
         </div>
       </div>
     </div>
@@ -509,17 +394,13 @@ const ResellerDashboard: React.FC<{ firstName: string }> = ({ firstName }) => {
         )}
       </div>
 
-      {/* Bottom row — Announcements + Quick Actions */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-        <AnnouncementsWidget />
-
-        <div className="sh-card" style={{ padding: '1.25rem 1.5rem' }}>
-          <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--navy-900)', marginBottom: '0.875rem' }}>Quick Actions</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <QuickAction label="Manage Clients" sub="Add or manage your clients"  Icon={UserGroupIcon}          color="#6366f1" onClick={() => navigate('/reseller/clients')} />
-            <QuickAction label="Single Label"   sub="Generate a label for client" Icon={TagIcon}              color="#0ea5e9" onClick={() => navigate('/labels/single')} />
-            <QuickAction label="Bulk Labels"    sub="Upload CSV for many labels"  Icon={ClipboardDocumentListIcon} color="#f59e0b" onClick={() => navigate('/labels/bulk')} />
-          </div>
+      {/* Quick Actions */}
+      <div className="sh-card" style={{ padding: '1.25rem 1.5rem' }}>
+        <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--navy-900)', marginBottom: '0.875rem' }}>Quick Actions</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
+          <QuickAction label="Manage Clients" sub="Add or manage your clients"  Icon={UserGroupIcon}              color="#6366f1" onClick={() => navigate('/reseller/clients')} />
+          <QuickAction label="Single Label"   sub="Generate a label for client" Icon={TagIcon}                   color="#0ea5e9" onClick={() => navigate('/labels/single')} />
+          <QuickAction label="Bulk Labels"    sub="Upload CSV for many labels"  Icon={ClipboardDocumentListIcon} color="#f59e0b" onClick={() => navigate('/labels/bulk')} />
         </div>
       </div>
     </div>

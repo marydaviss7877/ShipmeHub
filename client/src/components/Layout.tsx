@@ -1,6 +1,32 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Outlet, useLocation, useNavigate, Link } from 'react-router-dom';
+import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
+
+// ── Announcement types ────────────────────────────────────────────────────────
+interface Announcement {
+  _id: string;
+  title: string;
+  content: string;
+  category: 'general' | 'service' | 'pricing' | 'maintenance';
+  isPinned: boolean;
+  createdAt: string;
+}
+
+const CAT_STYLE: Record<string, { bar: string; bg: string; text: string; badge: string; badgeText: string }> = {
+  general:     { bar: '#3B82F6', bg: '#EFF6FF', text: '#1E40AF', badge: '#DBEAFE', badgeText: '#1D4ED8' },
+  service:     { bar: '#22C55E', bg: '#F0FDF4', text: '#166534', badge: '#BBF7D0', badgeText: '#16A34A' },
+  pricing:     { bar: '#F59E0B', bg: '#FFFBEB', text: '#92400E', badge: '#FDE68A', badgeText: '#D97706' },
+  maintenance: { bar: '#EF4444', bg: '#FEF2F2', text: '#991B1B', badge: '#FECACA', badgeText: '#DC2626' },
+};
+
+const CAT_LABEL: Record<string, string> = {
+  general: 'General', service: 'Service', pricing: 'Pricing', maintenance: 'Maintenance',
+};
+
+const DISMISSED_KEY  = 'sh_dismissed_announcements';
+const LAST_SEEN_KEY  = 'sh_announcements_last_seen';
+const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
 import {
   HomeIcon,
   UserGroupIcon,
@@ -48,6 +74,14 @@ const Layout: React.FC = () => {
   const [tooltip, setTooltip] = useState<{ name: string; y: number } | null>(null);
   const tooltipTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // ── Announcement state ─────────────────────────────────────────────────────
+  const [announcements,  setAnnouncements]  = useState<Announcement[]>([]);
+  const [alertVisible,   setAlertVisible]   = useState(false);
+  const [alertIdx,       setAlertIdx]       = useState(0);   // which undismissed item to show
+  const [bellOpen,       setBellOpen]       = useState(false);
+  const [unreadCount,    setUnreadCount]    = useState(0);
+  const bellRef = useRef<HTMLDivElement>(null);
+
   const { user, logout } = useAuth();
   const location         = useLocation();
   const navigate         = useNavigate();
@@ -64,6 +98,63 @@ const Layout: React.FC = () => {
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
+
+  // ── Fetch announcements ────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!user) return;
+    const token = localStorage.getItem('token');
+    axios.get(`${API_BASE}/announcements`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(res => {
+        const list: Announcement[] = res.data.announcements || [];
+        setAnnouncements(list);
+
+        // Alert bar: find first undismissed
+        const dismissed: string[] = JSON.parse(localStorage.getItem(DISMISSED_KEY) || '[]');
+        const undismissed = list.filter(a => !dismissed.includes(a._id));
+        if (undismissed.length > 0) { setAlertVisible(true); setAlertIdx(0); }
+
+        // Bell badge: count items created after last-seen timestamp
+        const lastSeen = localStorage.getItem(LAST_SEEN_KEY);
+        const newCount = lastSeen
+          ? list.filter(a => new Date(a.createdAt) > new Date(lastSeen)).length
+          : list.length;
+        setUnreadCount(newCount);
+      })
+      .catch(() => {});
+  }, [user]);
+
+  // Close bell dropdown when clicking outside
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (bellRef.current && !bellRef.current.contains(e.target as Node)) setBellOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  // Announcement helpers
+  const dismissed = () : string[] => JSON.parse(localStorage.getItem(DISMISSED_KEY) || '[]');
+  const undismissedAnnouncements = announcements.filter(a => !dismissed().includes(a._id));
+  const currentAlert = undismissedAnnouncements[alertIdx] ?? null;
+
+  const dismissAlert = () => {
+    if (!currentAlert) return;
+    const d = dismissed();
+    d.push(currentAlert._id);
+    localStorage.setItem(DISMISSED_KEY, JSON.stringify(d));
+    const next = undismissedAnnouncements.filter(a => !d.includes(a._id));
+    if (next.length > 0) { setAlertIdx(0); }
+    else { setAlertVisible(false); }
+    // trigger re-render
+    setAnnouncements(prev => [...prev]);
+  };
+
+  const openBell = () => {
+    setBellOpen(v => !v);
+    // Mark as seen
+    localStorage.setItem(LAST_SEEN_KEY, new Date().toISOString());
+    setUnreadCount(0);
+  };
 
   // ── Navigation definitions ──────────────────────────────────────────────
   const overviewNav: NavItem[] = [
@@ -329,9 +420,99 @@ const Layout: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
 
             {/* Notification bell */}
-            <button className="topbar-icon-btn" title="Notifications">
-              <BellIcon style={{ width: 17, height: 17 }} />
-            </button>
+            <div ref={bellRef} style={{ position: 'relative' }}>
+              <button
+                className="topbar-icon-btn"
+                title="Notifications"
+                onClick={openBell}
+                style={{ position: 'relative' }}
+              >
+                <BellIcon style={{ width: 17, height: 17 }} />
+                {unreadCount > 0 && (
+                  <span style={{
+                    position: 'absolute', top: 2, right: 2,
+                    width: 8, height: 8, borderRadius: '50%',
+                    background: '#EF4444', border: '1.5px solid #fff',
+                  }} />
+                )}
+              </button>
+
+              {/* Bell dropdown */}
+              {bellOpen && (
+                <div style={{
+                  position: 'absolute', top: 'calc(100% + 10px)', right: 0,
+                  width: 340, background: '#fff', borderRadius: 14,
+                  border: '1.5px solid var(--navy-150, #e8edf5)',
+                  boxShadow: '0 16px 48px rgba(0,0,0,0.14)',
+                  zIndex: 9000, overflow: 'hidden',
+                }}>
+                  {/* Header */}
+                  <div style={{
+                    padding: '0.85rem 1.1rem 0.7rem',
+                    borderBottom: '1px solid var(--navy-100)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  }}>
+                    <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--navy-900)' }}>Announcements</span>
+                    <button
+                      onClick={() => { setBellOpen(false); navigate('/announcements'); }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.72rem', color: 'var(--accent-600)', fontWeight: 600 }}
+                    >
+                      View all →
+                    </button>
+                  </div>
+
+                  {/* Items */}
+                  <div style={{ maxHeight: 320, overflowY: 'auto' }}>
+                    {announcements.length === 0 ? (
+                      <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--navy-400)', fontSize: '0.82rem' }}>
+                        No announcements yet.
+                      </div>
+                    ) : (
+                      announcements.slice(0, 6).map((a, i) => {
+                        const cat = CAT_STYLE[a.category] ?? CAT_STYLE.general;
+                        const isNew = !localStorage.getItem(LAST_SEEN_KEY) ||
+                          new Date(a.createdAt) > new Date(localStorage.getItem(LAST_SEEN_KEY)!);
+                        return (
+                          <div
+                            key={a._id}
+                            onClick={() => { setBellOpen(false); navigate('/announcements'); }}
+                            style={{
+                              display: 'flex', gap: 10, padding: '0.7rem 1.1rem',
+                              borderBottom: i < announcements.slice(0,6).length - 1 ? '1px solid var(--navy-50)' : 'none',
+                              cursor: 'pointer', background: isNew ? `${cat.bg}80` : '#fff',
+                              transition: 'background 0.1s',
+                            }}
+                            onMouseEnter={e => (e.currentTarget.style.background = 'var(--navy-50)')}
+                            onMouseLeave={e => (e.currentTarget.style.background = isNew ? `${cat.bg}80` : '#fff')}
+                          >
+                            {/* Accent bar */}
+                            <div style={{ width: 3, borderRadius: 99, background: cat.bar, flexShrink: 0, alignSelf: 'stretch', minHeight: 28 }} />
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                                <span style={{
+                                  fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.05em',
+                                  textTransform: 'uppercase', padding: '1px 6px', borderRadius: 99,
+                                  background: cat.badge, color: cat.badgeText,
+                                }}>
+                                  {CAT_LABEL[a.category]}
+                                </span>
+                                {isNew && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#EF4444', flexShrink: 0 }} />}
+                              </div>
+                              <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--navy-800)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {a.title}
+                              </div>
+                              <div style={{ fontSize: '0.7rem', color: 'var(--navy-400)', marginTop: 1 }}>
+                                {new Date(a.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Divider */}
             <div style={{ width: 1, height: 24, background: 'var(--navy-100)' }} />
@@ -350,6 +531,70 @@ const Layout: React.FC = () => {
             </div>
           </div>
         </header>
+
+        {/* ── Announcement alert bar ──────────────────────────── */}
+        {alertVisible && currentAlert && (() => {
+          const cat = CAT_STYLE[currentAlert.category] ?? CAT_STYLE.general;
+          return (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '0 1.5rem',
+              background: cat.bg,
+              borderBottom: `1px solid ${cat.badge}`,
+              minHeight: 42,
+              animation: 'alertSlideDown 0.22s cubic-bezier(0.4,0,0.2,1) both',
+            }}>
+              {/* Left colored line */}
+              <div style={{ width: 3, height: 24, borderRadius: 99, background: cat.bar, flexShrink: 0 }} />
+
+              {/* Category badge */}
+              <span style={{
+                fontSize: '0.63rem', fontWeight: 800, letterSpacing: '0.06em',
+                textTransform: 'uppercase', padding: '2px 8px', borderRadius: 99,
+                background: cat.badge, color: cat.badgeText, flexShrink: 0,
+                border: `1px solid ${cat.badgeText}33`,
+              }}>
+                {CAT_LABEL[currentAlert.category]}
+              </span>
+
+              {/* Title */}
+              <span style={{
+                flex: 1, fontSize: '0.8rem', fontWeight: 600, color: cat.text,
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              }}>
+                {currentAlert.title}
+              </span>
+
+              {/* View button */}
+              <button
+                onClick={() => { setAlertVisible(false); navigate('/announcements'); }}
+                style={{
+                  padding: '3px 11px', borderRadius: 7, border: `1.5px solid ${cat.badgeText}55`,
+                  background: 'transparent', color: cat.badgeText, fontSize: '0.73rem',
+                  fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                }}
+              >
+                View →
+              </button>
+
+              {/* Dismiss */}
+              <button
+                onClick={dismissAlert}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: cat.text, opacity: 0.55, padding: '2px 4px',
+                  borderRadius: 5, flexShrink: 0, display: 'flex', alignItems: 'center',
+                  transition: 'opacity 0.12s',
+                }}
+                title="Dismiss"
+                onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+                onMouseLeave={e => (e.currentTarget.style.opacity = '0.55')}
+              >
+                <XMarkIcon style={{ width: 15, height: 15 }} />
+              </button>
+            </div>
+          );
+        })()}
 
         {/* Page content */}
         <main className="page-content">
@@ -404,6 +649,10 @@ const Layout: React.FC = () => {
         @keyframes tooltipPop {
           from { opacity: 0; transform: translateY(-50%) scale(0.88) translateX(-6px); }
           to   { opacity: 1; transform: translateY(-50%) scale(1)    translateX(0); }
+        }
+        @keyframes alertSlideDown {
+          from { opacity: 0; max-height: 0; }
+          to   { opacity: 1; max-height: 60px; }
         }
         @media (max-width: 768px) {
           .mobile-menu-btn        { display: flex !important; }

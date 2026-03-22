@@ -98,4 +98,34 @@ const userLabelsReady = (userName, jobId, carrier, labelCount, downloadUrl) => (
   `,
 });
 
-module.exports = { sendEmail, vendorJobAssigned, vendorJobCancelled, vendorUploadRejected, userLabelsReady };
+const CATEGORY_LABEL = { general: 'General', service: 'Service Update', pricing: 'Pricing', maintenance: 'Maintenance' };
+const CATEGORY_COLOR = { general: '#2563EB', service: '#16A34A', pricing: '#D97706', maintenance: '#DC2626' };
+
+const announcementNotification = (userName, title, content, category, portalUrl) => {
+  const catLabel = CATEGORY_LABEL[category] || 'General';
+  const catColor = CATEGORY_COLOR[category] || '#2563EB';
+  return {
+    subject: `[ShipmeHub] ${catLabel}: ${title}`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#f8fafc;padding:24px;border-radius:8px;">
+        <div style="background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e2e8f0;">
+          <div style="height:4px;background:${catColor};"></div>
+          <div style="padding:24px;">
+            <div style="display:inline-block;padding:3px 12px;border-radius:99px;background:${catColor}18;color:${catColor};font-size:12px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;border:1px solid ${catColor}33;margin-bottom:14px;">
+              ${catLabel}
+            </div>
+            <h2 style="color:#0f172a;margin:0 0 12px;font-size:20px;line-height:1.3;">${title}</h2>
+            <p style="color:#475569;font-size:15px;line-height:1.6;margin:0 0 20px;">${content}</p>
+            <a href="${portalUrl}" style="display:inline-block;background:#2563eb;color:#fff;padding:11px 24px;border-radius:7px;text-decoration:none;font-weight:600;font-size:14px;">View Announcement →</a>
+          </div>
+        </div>
+        <p style="margin-top:16px;color:#94a3b8;font-size:11px;text-align:center;">
+          Hello ${userName} — you're receiving this because you have announcement emails enabled.<br/>
+          You can turn this off in your <a href="${portalUrl}/profile" style="color:#64748b;">profile settings</a>.
+        </p>
+      </div>
+    `,
+  };
+};
+
+module.exports = { sendEmail, vendorJobAssigned, vendorJobCancelled, vendorUploadRejected, userLabelsReady, announcementNotification };
