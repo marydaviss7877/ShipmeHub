@@ -86,11 +86,17 @@ const Layout: React.FC = () => {
   const location         = useLocation();
   const navigate         = useNavigate();
 
-  // Persist collapse state + sync CSS variable for fixed-position children
+  // Persist collapse state + sync CSS variables
   useEffect(() => {
     localStorage.setItem(COLLAPSED_KEY, collapsed ? '1' : '0');
     document.documentElement.style.setProperty('--sidebar-w', collapsed ? '72px' : '256px');
   }, [collapsed]);
+
+  // Sync alert bar height CSS variable
+  useEffect(() => {
+    const h = (alertVisible && currentAlert) ? '42px' : '0px';
+    document.documentElement.style.setProperty('--alert-h', h);
+  }, [alertVisible, currentAlert]);
 
   // Auto-expand sidebar on mobile breakpoint
   useEffect(() => {
@@ -243,6 +249,65 @@ const Layout: React.FC = () => {
 
   return (
     <div style={{ minHeight: '100vh' }}>
+
+      {/* ── Fixed full-width announcement bar ───────────────── */}
+      {alertVisible && currentAlert && (() => {
+        const cat = CAT_STYLE[currentAlert.category] ?? CAT_STYLE.general;
+        return (
+          <div style={{
+            position: 'fixed', top: 0, left: 0, right: 0,
+            zIndex: 9999,
+            display: 'flex', alignItems: 'center', gap: 10,
+            padding: '0 1.5rem',
+            background: cat.bg,
+            borderBottom: `1px solid ${cat.badge}`,
+            height: 42,
+            animation: 'alertSlideDown 0.22s cubic-bezier(0.4,0,0.2,1) both',
+          }}>
+            <div style={{ width: 3, height: 22, borderRadius: 99, background: cat.bar, flexShrink: 0 }} />
+            <span style={{
+              fontSize: '0.63rem', fontWeight: 800, letterSpacing: '0.06em',
+              textTransform: 'uppercase', padding: '2px 8px', borderRadius: 99,
+              background: cat.badge, color: cat.badgeText, flexShrink: 0,
+              border: `1px solid ${cat.badgeText}33`,
+            }}>
+              {CAT_LABEL[currentAlert.category]}
+            </span>
+            <span style={{
+              flex: 1, fontSize: '0.8rem', fontWeight: 600, color: cat.text,
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            }}>
+              {currentAlert.title}
+            </span>
+            <button
+              onClick={() => { setAlertVisible(false); navigate('/announcements'); }}
+              style={{
+                padding: '3px 11px', borderRadius: 7,
+                border: `1.5px solid ${cat.badgeText}55`,
+                background: 'transparent', color: cat.badgeText,
+                fontSize: '0.73rem', fontWeight: 700, cursor: 'pointer',
+                whiteSpace: 'nowrap', flexShrink: 0,
+              }}
+            >
+              View →
+            </button>
+            <button
+              onClick={dismissAlert}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: cat.text, opacity: 0.5, padding: '2px 4px',
+                borderRadius: 5, flexShrink: 0, display: 'flex', alignItems: 'center',
+                transition: 'opacity 0.12s',
+              }}
+              title="Dismiss"
+              onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+              onMouseLeave={e => (e.currentTarget.style.opacity = '0.5')}
+            >
+              <XMarkIcon style={{ width: 15, height: 15 }} />
+            </button>
+          </div>
+        );
+      })()}
 
       {/* Mobile overlay */}
       {sidebarOpen && (
@@ -531,70 +596,6 @@ const Layout: React.FC = () => {
             </div>
           </div>
         </header>
-
-        {/* ── Announcement alert bar ──────────────────────────── */}
-        {alertVisible && currentAlert && (() => {
-          const cat = CAT_STYLE[currentAlert.category] ?? CAT_STYLE.general;
-          return (
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 10,
-              padding: '0 1.5rem',
-              background: cat.bg,
-              borderBottom: `1px solid ${cat.badge}`,
-              minHeight: 42,
-              animation: 'alertSlideDown 0.22s cubic-bezier(0.4,0,0.2,1) both',
-            }}>
-              {/* Left colored line */}
-              <div style={{ width: 3, height: 24, borderRadius: 99, background: cat.bar, flexShrink: 0 }} />
-
-              {/* Category badge */}
-              <span style={{
-                fontSize: '0.63rem', fontWeight: 800, letterSpacing: '0.06em',
-                textTransform: 'uppercase', padding: '2px 8px', borderRadius: 99,
-                background: cat.badge, color: cat.badgeText, flexShrink: 0,
-                border: `1px solid ${cat.badgeText}33`,
-              }}>
-                {CAT_LABEL[currentAlert.category]}
-              </span>
-
-              {/* Title */}
-              <span style={{
-                flex: 1, fontSize: '0.8rem', fontWeight: 600, color: cat.text,
-                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-              }}>
-                {currentAlert.title}
-              </span>
-
-              {/* View button */}
-              <button
-                onClick={() => { setAlertVisible(false); navigate('/announcements'); }}
-                style={{
-                  padding: '3px 11px', borderRadius: 7, border: `1.5px solid ${cat.badgeText}55`,
-                  background: 'transparent', color: cat.badgeText, fontSize: '0.73rem',
-                  fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
-                }}
-              >
-                View →
-              </button>
-
-              {/* Dismiss */}
-              <button
-                onClick={dismissAlert}
-                style={{
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  color: cat.text, opacity: 0.55, padding: '2px 4px',
-                  borderRadius: 5, flexShrink: 0, display: 'flex', alignItems: 'center',
-                  transition: 'opacity 0.12s',
-                }}
-                title="Dismiss"
-                onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
-                onMouseLeave={e => (e.currentTarget.style.opacity = '0.55')}
-              >
-                <XMarkIcon style={{ width: 15, height: 15 }} />
-              </button>
-            </div>
-          );
-        })()}
 
         {/* Page content */}
         <main className="page-content">
