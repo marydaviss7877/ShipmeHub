@@ -107,34 +107,32 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Root endpoint
-app.get('/', (req, res) => {
-  res.json({
-    message: 'USPS Label Portal API',
-    version: '1.0.0',
-    endpoints: {
-      health: '/api/health',
-      auth: '/api/auth',
-      users: '/api/users',
-      files: '/api/files',
-      email: '/api/email',
-      balance: '/api/balance',
-      rates: '/api/rates',
-      carriers: '/api/carriers',
-      vendors: '/api/vendors',
-      labels: '/api/labels',
-      access: '/api/access'
-    }
-  });
-});
-
-// Serve React build in production; 404 for unknown API routes in development
+// Serve React build in production; API info + 404 in development
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../client/build')));
   app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
   });
 } else {
+  app.get('/', (req, res) => {
+    res.json({
+      message: 'USPS Label Portal API',
+      version: '1.0.0',
+      endpoints: {
+        health: '/api/health',
+        auth: '/api/auth',
+        users: '/api/users',
+        files: '/api/files',
+        email: '/api/email',
+        balance: '/api/balance',
+        rates: '/api/rates',
+        carriers: '/api/carriers',
+        vendors: '/api/vendors',
+        labels: '/api/labels',
+        access: '/api/access'
+      }
+    });
+  });
   app.use('*', (req, res) => {
     res.status(404).json({ message: 'Route not found' });
   });
