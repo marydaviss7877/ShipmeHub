@@ -12,7 +12,7 @@ import Dashboard from './pages/Dashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import UserManagement from './pages/UserManagement';
 import Profile from './pages/Profile';
-import Carriers from './pages/Carriers';
+import Announcements from './pages/Announcements';
 import LabelGenerator from './pages/LabelGenerator';
 import LabelHistory from './pages/LabelHistory';
 import BulkLabels from './pages/BulkLabels';
@@ -63,8 +63,10 @@ function App() {
                   <Route path="dashboard" element={<Dashboard />} />
                   <Route path="profile"   element={<Profile />} />
 
+                  {/* Announcements */}
+                  <Route path="announcements" element={<Announcements />} />
+
                   {/* Non-manifested (API) labels */}
-                  <Route path="carriers"      element={<Carriers />} />
                   <Route path="labels/single" element={<LabelGenerator />} />
                   <Route path="labels/bulk"   element={<BulkLabelGenerator />} />
                   <Route path="labels/history" element={<LabelHistory />} />

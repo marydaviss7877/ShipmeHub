@@ -21,6 +21,7 @@ import {
   ChevronLeftIcon,
   ChevronDownIcon,
   BellIcon,
+  MegaphoneIcon,
 } from '@heroicons/react/24/outline';
 
 interface NavItem {
@@ -66,12 +67,12 @@ const Layout: React.FC = () => {
 
   // ── Navigation definitions ──────────────────────────────────────────────
   const overviewNav: NavItem[] = [
-    { name: 'Dashboard',     href: '/dashboard', icon: HomeIcon,   current: location.pathname === '/dashboard' },
-    { name: 'Live Activity', href: '/activity',  icon: SignalIcon, current: location.pathname === '/activity'  },
+    { name: 'Dashboard',      href: '/dashboard',      icon: HomeIcon,      current: location.pathname === '/dashboard' },
+    { name: 'Announcements',  href: '/announcements',  icon: MegaphoneIcon, current: location.pathname === '/announcements' },
+    { name: 'Live Activity',  href: '/activity',       icon: SignalIcon,    current: location.pathname === '/activity'  },
   ];
 
   const labelsNav: NavItem[] = [
-    { name: 'Services',       href: '/carriers',            icon: TruckIcon,                 current: location.pathname.startsWith('/carriers') },
     { name: 'Single Label',   href: '/labels/single',       icon: TagIcon,                   current: location.pathname === '/labels/single' },
     { name: 'Bulk Labels',    href: '/labels/bulk',          icon: RectangleStackIcon,        current: location.pathname === '/labels/bulk' },
     { name: 'Single History', href: '/labels/history',      icon: ClipboardDocumentListIcon, current: location.pathname === '/labels/history' },
