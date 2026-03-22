@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
@@ -63,7 +63,6 @@ const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const fmt$ = (n: number) => `$${Math.abs(n).toFixed(2)}${n < 0 ? ' (owed)' : ''}`;
 const fmtN = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 1 });
 
 const CarrierBadge: React.FC<{ carrier: string }> = ({ carrier }) => {
@@ -100,7 +99,7 @@ const Finance: React.FC = () => {
   // ── Data state
   const [rows,         setRows]         = useState<FinanceRow[]>([]);
   const [summary,      setSummary]      = useState<Summary | null>(null);
-  const [usdToPkr,     setUsdToPkr]     = useState(280);
+  const [, setUsdToPkr] = useState<number>(280);
   const [loading,      setLoading]      = useState(true);
 
   // ── Filters

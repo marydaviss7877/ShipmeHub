@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
 import {
   UserGroupIcon, TagIcon, ClipboardDocumentListIcon, CurrencyDollarIcon,
-  BuildingStorefrontIcon, CheckCircleIcon, ClockIcon, ExclamationTriangleIcon,
+  BuildingStorefrontIcon, ExclamationTriangleIcon,
   ArrowPathIcon, UserPlusIcon, TruckIcon, Squares2X2Icon,
 } from '@heroicons/react/24/outline';
 import {

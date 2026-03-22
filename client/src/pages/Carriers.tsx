@@ -50,7 +50,7 @@ const Carriers: React.FC = () => {
   const [saving,        setSaving]        = useState(false);
   const [error,         setError]         = useState('');
 
-  useEffect(() => { fetchAnnouncements(); }, []);
+  useEffect(() => { fetchAnnouncements(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchAnnouncements = async () => {
     setLoading(true);

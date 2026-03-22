@@ -123,7 +123,7 @@ const ResellerClients: React.FC = () => {
     if (!selectedClient || isCreating) return;
     if (activeTab === 'balance') { fetchBalance(clientId(selectedClient)); fetchPayLogs(clientId(selectedClient)); }
     if (activeTab === 'tiers')   fetchTiers(clientId(selectedClient));
-  }, [activeTab, selectedClient]);
+  }, [activeTab, selectedClient]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (message || error) {

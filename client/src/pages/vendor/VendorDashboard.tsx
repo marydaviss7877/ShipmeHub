@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { useVendorAuth } from '../../contexts/VendorAuthContext';
 import {
-  ArrowDownTrayIcon, CheckCircleIcon, ClockIcon,
+  CheckCircleIcon, ClockIcon,
   ExclamationTriangleIcon, QueueListIcon,
 } from '@heroicons/react/24/outline';
 
@@ -21,7 +21,7 @@ const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }
 };
 
 const VendorDashboard: React.FC = () => {
-  const { token, vendor } = useVendorAuth();
+  const { token } = useVendorAuth();
   const [jobs,    setJobs]    = useState<any[]>([]);
   const [stats,   setStats]   = useState({ assigned: 0, accepted: 0, completed: 0, earnings: 0 });
   const [loading, setLoading] = useState(true);
@@ -53,7 +53,7 @@ const VendorDashboard: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [token, page, statusFilter]);
+  }, [token, page, statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { fetchJobs(); }, [fetchJobs]);
 
@@ -63,7 +63,7 @@ const VendorDashboard: React.FC = () => {
     axios.get(`${API}/vendor-portal/me`, { headers: authHeaders })
       .then(r => setEarning(r.data.vendor))
       .catch(() => {});
-  }, [token]);
+  }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div style={{ padding: '2rem' }}>

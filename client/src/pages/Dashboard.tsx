@@ -3,9 +3,8 @@ import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
 import {
-  CurrencyDollarIcon, TagIcon, ClipboardDocumentListIcon, CheckCircleIcon,
+  CurrencyDollarIcon, TagIcon, ClipboardDocumentListIcon,
   UserGroupIcon, ArrowUpRightIcon, TruckIcon, ClockIcon,
-  ArrowPathIcon, UserPlusIcon, BuildingStorefrontIcon,
 } from '@heroicons/react/24/outline';
 
 // ── Types ─────────────────────────────────────────────────────────────────────

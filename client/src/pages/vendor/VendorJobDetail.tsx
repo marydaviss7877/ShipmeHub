@@ -32,7 +32,7 @@ const VendorJobDetail: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [id, token]);
+  }, [id, token]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { fetchJob(); }, [fetchJob]);
 

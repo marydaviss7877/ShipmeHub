@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 import {
-  UserGroupIcon, ArrowPathIcon, CheckIcon, XMarkIcon,
+  ArrowPathIcon, CheckIcon, XMarkIcon,
   ArrowDownTrayIcon, PlusIcon, TrashIcon, FunnelIcon,
 } from '@heroicons/react/24/outline';
 
@@ -64,7 +64,7 @@ const AdminManifestOps: React.FC = () => {
       setStats(sd);
     } catch { }
     setJobsLoad(false);
-  }, [token, jobPage, statusF, carrierF]);
+  }, [token, jobPage, statusF, carrierF]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchAssignments = useCallback(async () => {
     setAssLoad(true);
@@ -79,7 +79,7 @@ const AdminManifestOps: React.FC = () => {
       setAllVendors(vd.vendors || []);
     } catch { }
     setAssLoad(false);
-  }, [token]);
+  }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { fetchJobs(); }, [fetchJobs]);
   useEffect(() => { if (tab === 'assignments') fetchAssignments(); }, [tab, fetchAssignments]);

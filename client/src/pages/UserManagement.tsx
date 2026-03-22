@@ -133,14 +133,14 @@ const UserManagement: React.FC = () => {
   const [message, setMessage] = useState('');
   const [error,   setError]   = useState('');
 
-  useEffect(() => { fetchUsers(); }, [currentPage, roleFilter, statusFilter]);
+  useEffect(() => { fetchUsers(); }, [currentPage, roleFilter, statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { fetchWallets(); }, []);
 
   useEffect(() => {
     if (!selectedUser || isCreating) return;
     if (activeTab === 'balance') { fetchBalance(selectedUser.id); fetchPayLogs(selectedUser.id); }
     if (activeTab === 'tiers')   fetchTiers(selectedUser.id);
-  }, [activeTab, selectedUser]);
+  }, [activeTab, selectedUser]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (message || error) {

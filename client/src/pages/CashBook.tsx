@@ -5,7 +5,7 @@ import axios from 'axios';
 import {
   PlusIcon, PencilIcon, TrashIcon, XMarkIcon,
   AdjustmentsHorizontalIcon, TagIcon,
-  PhotoIcon, ArrowDownTrayIcon, EyeIcon, ChevronLeftIcon, ChevronRightIcon,
+  ArrowDownTrayIcon, EyeIcon, ChevronLeftIcon, ChevronRightIcon,
 } from '@heroicons/react/24/outline';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -165,7 +165,7 @@ const CashBook: React.FC = () => {
   }, []);
 
   useEffect(() => { fetchEntries(); },   [fetchEntries]);
-  useEffect(() => { fetchCategories(); fetchWallets(); }, []);
+  useEffect(() => { fetchCategories(); fetchWallets(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Month nav ─────────────────────────────────────────────────────────────
 

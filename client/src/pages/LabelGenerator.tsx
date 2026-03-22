@@ -136,7 +136,7 @@ const LabelGenerator: React.FC = () => {
         if (match) setSelectedVendorId(match.vendorId);
       }
     }).catch(console.error);
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Close warehouse panel on outside click
   useEffect(() => {

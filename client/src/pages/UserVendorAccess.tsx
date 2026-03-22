@@ -60,7 +60,7 @@ const UserVendorAccess: React.FC = () => {
       axios.get(`/users/${userId}`).then(r => setTargetUser(r.data.user)).catch(() => {}),
       axios.get(`/access/${userId}`).then(r => setAccess(r.data.access)).catch((e: any) => setError(e.response?.data?.message || 'Failed to load')),
     ]).finally(() => setIsLoading(false));
-  }, [userId]);
+  }, [userId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (message || error) {

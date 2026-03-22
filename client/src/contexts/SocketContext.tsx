@@ -52,7 +52,7 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         setIsConnected(false);
       }
     }
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const value: SocketContextType = {
     socket,

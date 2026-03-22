@@ -42,7 +42,6 @@ const CARRIER_CFG: Record<string, { color: string; glow: string; pct: number }> 
 };
 const CARRIERS = ['USPS', 'UPS', 'FedEx', 'DHL'] as const;
 
-const REGIONS = ['Northeast','West Coast','Midwest','South','Southeast','Southwest','Mountain','Pacific NW'];
 
 // ── Seeded random (deterministic on first render, changes per session) ──
 const rand = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;

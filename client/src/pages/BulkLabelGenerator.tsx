@@ -8,7 +8,7 @@ import dhlLogo   from '../Logos/DHL-Logo.wine.png';
 import {
   TruckIcon, ArrowDownTrayIcon, ArrowUpTrayIcon, CheckCircleIcon,
   ExclamationCircleIcon, DocumentTextIcon, XMarkIcon, ClockIcon,
-  ClipboardDocumentListIcon, PlusIcon, TrashIcon, ChevronDownIcon,
+  ClipboardDocumentListIcon, PlusIcon, TrashIcon,
   ArrowLeftIcon,
 } from '@heroicons/react/24/outline';
 
