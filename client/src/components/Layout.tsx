@@ -2,31 +2,6 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Outlet, useLocation, useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
-
-// ── Announcement types ────────────────────────────────────────────────────────
-interface Announcement {
-  _id: string;
-  title: string;
-  content: string;
-  category: 'general' | 'service' | 'pricing' | 'maintenance';
-  isPinned: boolean;
-  createdAt: string;
-}
-
-const CAT_STYLE: Record<string, { bar: string; bg: string; text: string; badge: string; badgeText: string }> = {
-  general:     { bar: '#3B82F6', bg: '#EFF6FF', text: '#1E40AF', badge: '#DBEAFE', badgeText: '#1D4ED8' },
-  service:     { bar: '#22C55E', bg: '#F0FDF4', text: '#166534', badge: '#BBF7D0', badgeText: '#16A34A' },
-  pricing:     { bar: '#F59E0B', bg: '#FFFBEB', text: '#92400E', badge: '#FDE68A', badgeText: '#D97706' },
-  maintenance: { bar: '#EF4444', bg: '#FEF2F2', text: '#991B1B', badge: '#FECACA', badgeText: '#DC2626' },
-};
-
-const CAT_LABEL: Record<string, string> = {
-  general: 'General', service: 'Service', pricing: 'Pricing', maintenance: 'Maintenance',
-};
-
-const DISMISSED_KEY  = 'sh_dismissed_announcements';
-const LAST_SEEN_KEY  = 'sh_announcements_last_seen';
-const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
 import {
   HomeIcon,
   UserGroupIcon,
@@ -49,6 +24,31 @@ import {
   BellIcon,
   MegaphoneIcon,
 } from '@heroicons/react/24/outline';
+
+// ── Announcement types ────────────────────────────────────────────────────────
+interface Announcement {
+  _id: string;
+  title: string;
+  content: string;
+  category: 'general' | 'service' | 'pricing' | 'maintenance';
+  isPinned: boolean;
+  createdAt: string;
+}
+
+const CAT_STYLE: Record<string, { bar: string; bg: string; text: string; badge: string; badgeText: string }> = {
+  general:     { bar: '#3B82F6', bg: '#EFF6FF', text: '#1E40AF', badge: '#DBEAFE', badgeText: '#1D4ED8' },
+  service:     { bar: '#22C55E', bg: '#F0FDF4', text: '#166534', badge: '#BBF7D0', badgeText: '#16A34A' },
+  pricing:     { bar: '#F59E0B', bg: '#FFFBEB', text: '#92400E', badge: '#FDE68A', badgeText: '#D97706' },
+  maintenance: { bar: '#EF4444', bg: '#FEF2F2', text: '#991B1B', badge: '#FECACA', badgeText: '#DC2626' },
+};
+
+const CAT_LABEL: Record<string, string> = {
+  general: 'General', service: 'Service', pricing: 'Pricing', maintenance: 'Maintenance',
+};
+
+const DISMISSED_KEY = 'sh_dismissed_announcements';
+const LAST_SEEN_KEY = 'sh_announcements_last_seen';
+const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
 
 interface NavItem {
   name: string;
