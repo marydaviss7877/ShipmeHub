@@ -92,12 +92,6 @@ const Layout: React.FC = () => {
     document.documentElement.style.setProperty('--sidebar-w', collapsed ? '72px' : '256px');
   }, [collapsed]);
 
-  // Sync alert bar height CSS variable
-  useEffect(() => {
-    const h = (alertVisible && currentAlert) ? '42px' : '0px';
-    document.documentElement.style.setProperty('--alert-h', h);
-  }, [alertVisible, currentAlert]);
-
   // Auto-expand sidebar on mobile breakpoint
   useEffect(() => {
     const onResize = () => { if (window.innerWidth < 768) setCollapsed(false); };
@@ -115,8 +109,8 @@ const Layout: React.FC = () => {
         setAnnouncements(list);
 
         // Alert bar: find first undismissed
-        const dismissed: string[] = JSON.parse(localStorage.getItem(DISMISSED_KEY) || '[]');
-        const undismissed = list.filter(a => !dismissed.includes(a._id));
+        const d: string[] = JSON.parse(localStorage.getItem(DISMISSED_KEY) || '[]');
+        const undismissed = list.filter(a => !d.includes(a._id));
         if (undismissed.length > 0) { setAlertVisible(true); setAlertIdx(0); }
 
         // Bell badge: count items created after last-seen timestamp
@@ -138,14 +132,19 @@ const Layout: React.FC = () => {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // Announcement helpers
-  const dismissed = () : string[] => JSON.parse(localStorage.getItem(DISMISSED_KEY) || '[]');
-  const undismissedAnnouncements = announcements.filter(a => !dismissed().includes(a._id));
+  // ── Announcement helpers (derived, declared before any effect that uses them)
+  const getDismissed = (): string[] => JSON.parse(localStorage.getItem(DISMISSED_KEY) || '[]');
+  const undismissedAnnouncements = announcements.filter(a => !getDismissed().includes(a._id));
   const currentAlert = undismissedAnnouncements[alertIdx] ?? null;
+
+  // Sync alert bar height CSS variable (currentAlert is now declared above)
+  useEffect(() => {
+    document.documentElement.style.setProperty('--alert-h', alertVisible && currentAlert ? '42px' : '0px');
+  }, [alertVisible, currentAlert]);
 
   const dismissAlert = () => {
     if (!currentAlert) return;
-    const d = dismissed();
+    const d = getDismissed();
     d.push(currentAlert._id);
     localStorage.setItem(DISMISSED_KEY, JSON.stringify(d));
     const next = undismissedAnnouncements.filter(a => !d.includes(a._id));
