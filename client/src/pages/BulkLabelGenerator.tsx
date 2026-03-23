@@ -506,7 +506,7 @@ const BulkLabelGenerator: React.FC = () => {
               </option>
               {vendorsForCarrier.map(v => (
                 <option key={v.vendorId} value={v.vendorId}>
-                  {v.vendorName}{v.shippingService ? ` · ${v.shippingService}` : ''} — {v.rateTiers?.length > 0 ? 'Tiered' : `$${v.baseRate.toFixed(2)}/label`}
+                  {v.vendorName}{v.shippingService ? ` · ${v.shippingService}` : ''}
                 </option>
               ))}
             </select>
@@ -520,9 +520,6 @@ const BulkLabelGenerator: React.FC = () => {
                 ? <span className="badge badge-amber">Manifested</span>
                 : <span className="badge badge-green">Auto</span>
               }
-              <span className="badge badge-indigo">
-                {selectedVendor.rateTiers?.length > 0 ? 'Tiered' : `$${selectedVendor.baseRate.toFixed(2)}/label`}
-              </span>
             </div>
           )}
 

@@ -370,9 +370,6 @@ const LabelGenerator: React.FC = () => {
                 fontSize: '0.75rem', fontWeight: 700, transition: 'all 0.2s', flexShrink: 0,
               }}>
                 {weight > 0 ? `$${effectiveRate.toFixed(2)}` : `base $${selectedAccess.baseRate.toFixed(2)}`}
-                {selectedAccess.rateTiers?.length > 0 && (
-                  <span style={{ marginLeft: 4, fontWeight: 400, opacity: 0.65, fontSize: '0.65rem' }}>tiered</span>
-                )}
               </span>
             )}
 
