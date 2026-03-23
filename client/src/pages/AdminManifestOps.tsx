@@ -245,7 +245,7 @@ const AdminManifestOps: React.FC = () => {
                           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                             {/* Download request file */}
                             <button
-                              onClick={() => window.open(`${API}/admin/manifest/${job._id}/download-request`, '_blank')}
+                              onClick={() => window.open(`${API}/admin/manifest/${job._id}/download-request?token=${token}`, '_blank')}
                               className="btn btn-ghost btn-sm" title="Download request CSV"
                               style={{ padding: '4px 8px' }}>
                               <ArrowDownTrayIcon style={{ width: 13, height: 13 }} />
@@ -253,7 +253,7 @@ const AdminManifestOps: React.FC = () => {
                             {/* Download result file */}
                             {['uploaded', 'under_review', 'completed'].includes(job.status) && (
                               <button
-                                onClick={() => window.open(`${API}/admin/manifest/${job._id}/download-result`, '_blank')}
+                                onClick={() => window.open(`${API}/admin/manifest/${job._id}/download-result?token=${token}`, '_blank')}
                                 className="btn btn-success btn-sm" title="Download result"
                                 style={{ padding: '4px 8px' }}>
                                 <CheckIcon style={{ width: 13, height: 13 }} />

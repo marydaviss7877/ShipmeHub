@@ -68,7 +68,7 @@ const VendorJobDetail: React.FC = () => {
       const form = new FormData();
       form.append('file', file);
       await axios.post(`${API}/vendor-portal/jobs/${id}/upload`, form, {
-        headers: { ...authHeaders, 'Content-Type': 'multipart/form-data' },
+        headers: authHeaders,
       });
       setSuccess('File uploaded! You have 1 minute to cancel if you find an error.');
       setFile(null);

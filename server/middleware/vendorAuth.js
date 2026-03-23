@@ -3,7 +3,7 @@ const ManifestVendor = require('../models/ManifestVendor');
 
 const authenticateVendor = async (req, res, next) => {
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+  const token = (authHeader && authHeader.split(' ')[1]) || req.query.token;
 
   if (!token) {
     return res.status(401).json({ message: 'Vendor access token required' });

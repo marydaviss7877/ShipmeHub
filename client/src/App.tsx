@@ -25,11 +25,14 @@ import VendorLogin from './pages/vendor/VendorLogin';
 import VendorDashboard from './pages/vendor/VendorDashboard';
 import VendorJobDetail from './pages/vendor/VendorJobDetail';
 import VendorEarnings  from './pages/vendor/VendorEarnings';
+import ManifestHistory from './pages/ManifestHistory';
 import ResellerClients from './pages/ResellerClients';
 import SalesAgents         from './pages/SalesAgents';
 import Finance             from './pages/Finance';
 import CashBook            from './pages/CashBook';
 import FinancialDashboard  from './pages/FinancialDashboard';
+import AttendanceCheckIn  from './pages/AttendanceCheckIn';
+import AttendanceAdmin    from './pages/AttendanceAdmin';
 import './App.css';
 
 function App() {
@@ -73,7 +76,8 @@ function App() {
                   <Route path="labels/bulk-history" element={<BulkLabels />} />
 
                   {/* Manifested labels */}
-                  <Route path="manifest/upload" element={<Navigate to="/labels/bulk" replace />} />
+                  <Route path="manifest/upload"   element={<Navigate to="/labels/bulk" replace />} />
+                  <Route path="manifest/history"  element={<ManifestHistory />} />
 
                   {/* Admin routes */}
                   <Route path="admin"                         element={<AdminDashboard />} />
@@ -85,6 +89,10 @@ function App() {
                   <Route path="admin/finance"                 element={<Finance />} />
                   <Route path="admin/cashbook"               element={<CashBook />} />
                   <Route path="admin/financial-dashboard"    element={<FinancialDashboard />} />
+                  <Route path="admin/attendance"             element={<AttendanceAdmin />} />
+
+                  {/* Sales agent self check-in */}
+                  <Route path="attendance" element={<AttendanceCheckIn />} />
 
                   {/* Reseller portal */}
                   <Route path="reseller/clients"  element={<ResellerClients />} />

@@ -166,13 +166,17 @@ const Layout: React.FC = () => {
     { name: 'Dashboard',      href: '/dashboard',      icon: HomeIcon,      current: location.pathname === '/dashboard' },
     { name: 'Announcements',  href: '/announcements',  icon: MegaphoneIcon, current: location.pathname === '/announcements' },
     { name: 'Live Activity',  href: '/activity',       icon: SignalIcon,    current: location.pathname === '/activity'  },
+    ...(user?.role !== 'admin'
+      ? [{ name: 'My Attendance', href: '/attendance', icon: ClipboardDocumentListIcon, current: location.pathname === '/attendance' }]
+      : []),
   ];
 
   const labelsNav: NavItem[] = [
-    { name: 'Single Label',   href: '/labels/single',       icon: TagIcon,                   current: location.pathname === '/labels/single' },
-    { name: 'Bulk Labels',    href: '/labels/bulk',          icon: RectangleStackIcon,        current: location.pathname === '/labels/bulk' },
-    { name: 'Single History', href: '/labels/history',      icon: ClipboardDocumentListIcon, current: location.pathname === '/labels/history' },
-    { name: 'Bulk History',   href: '/labels/bulk-history', icon: ClipboardDocumentListIcon, current: location.pathname === '/labels/bulk-history' },
+    { name: 'Single Label',      href: '/labels/single',       icon: TagIcon,                   current: location.pathname === '/labels/single' },
+    { name: 'Bulk Labels',       href: '/labels/bulk',          icon: RectangleStackIcon,        current: location.pathname === '/labels/bulk' },
+    { name: 'Single History',    href: '/labels/history',      icon: ClipboardDocumentListIcon, current: location.pathname === '/labels/history' },
+    { name: 'Bulk History',      href: '/labels/bulk-history', icon: ClipboardDocumentListIcon, current: location.pathname === '/labels/bulk-history' },
+    { name: 'Manifest History',  href: '/manifest/history',    icon: Squares2X2Icon,            current: location.pathname === '/manifest/history' },
   ];
 
   const adminItems: NavItem[] = user?.role === 'admin' ? [
@@ -184,6 +188,7 @@ const Layout: React.FC = () => {
     { name: 'Finance',             href: '/admin/finance',             icon: BanknotesIcon,             current: location.pathname === '/admin/finance' },
     { name: 'Cash Book',           href: '/admin/cashbook',            icon: BookOpenIcon,              current: location.pathname === '/admin/cashbook' },
     { name: 'Financial Dashboard', href: '/admin/financial-dashboard', icon: PresentationChartLineIcon, current: location.pathname === '/admin/financial-dashboard' },
+    { name: 'Attendance',          href: '/admin/attendance',          icon: ClipboardDocumentListIcon,  current: location.pathname === '/admin/attendance' },
   ] : user?.role === 'reseller' ? [
     { name: 'My Clients', href: '/reseller/clients', icon: UserGroupIcon, current: location.pathname.startsWith('/reseller/clients') },
     { name: 'Finance',    href: '/reseller/finance', icon: BanknotesIcon, current: location.pathname === '/reseller/finance' },
