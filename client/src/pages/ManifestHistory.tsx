@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
-import { ArrowDownTrayIcon, ArrowPathIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { ArrowDownTrayIcon, ArrowPathIcon, XMarkIcon, FunnelIcon } from '@heroicons/react/24/outline';
 
 const API = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
 
@@ -65,123 +65,109 @@ const ManifestHistory: React.FC = () => {
     }
   };
 
+  const th: React.CSSProperties = { fontSize: '0.7rem', padding: '6px 10px', whiteSpace: 'nowrap' };
+  const td: React.CSSProperties = { fontSize: '0.78rem', padding: '5px 10px' };
+
   return (
     <div className="animate-fadeIn">
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">Manifest History</h1>
-          <p className="page-subtitle">Track all your manifested label requests</p>
+      {/* Header + filters in one tight row */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
+        <div style={{ flex: 1, minWidth: 160 }}>
+          <h1 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>Manifest History</h1>
         </div>
-        <button className="btn btn-ghost btn-sm" onClick={fetchJobs}>
-          <ArrowPathIcon style={{ width: 15, height: 15 }} /> Refresh
+        <FunnelIcon style={{ width: 14, height: 14, color: '#94a3b8', flexShrink: 0 }} />
+        <select value={statusF} onChange={e => { setStatusF(e.target.value); setPage(1); }}
+          className="form-input form-select" style={{ width: 140, fontSize: '0.78rem', padding: '4px 8px' }}>
+          <option value="">All Statuses</option>
+          {Object.entries(STATUS_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+        </select>
+        <select value={carrierF} onChange={e => { setCarrierF(e.target.value); setPage(1); }}
+          className="form-input form-select" style={{ width: 110, fontSize: '0.78rem', padding: '4px 8px' }}>
+          <option value="">All Carriers</option>
+          {['USPS', 'UPS', 'FedEx', 'DHL'].map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{total} job{total !== 1 ? 's' : ''}</span>
+        <button className="btn btn-ghost btn-sm" onClick={fetchJobs} style={{ padding: '3px 8px' }}>
+          <ArrowPathIcon style={{ width: 13, height: 13 }} />
         </button>
       </div>
 
-      {/* Filters */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
-        <select
-          value={statusF}
-          onChange={e => { setStatusF(e.target.value); setPage(1); }}
-          className="form-input form-select"
-          style={{ width: 170 }}
-        >
-          <option value="">All Statuses</option>
-          {Object.entries(STATUS_META).map(([k, v]) => (
-            <option key={k} value={k}>{v.label}</option>
-          ))}
-        </select>
-        <select
-          value={carrierF}
-          onChange={e => { setCarrierF(e.target.value); setPage(1); }}
-          className="form-input form-select"
-          style={{ width: 130 }}
-        >
-          <option value="">All Carriers</option>
-          {['USPS', 'UPS', 'FedEx', 'DHL'].map(c => (
-            <option key={c} value={c}>{c}</option>
-          ))}
-        </select>
-        <span style={{ fontSize: '0.82rem', color: '#94a3b8' }}>{total} job{total !== 1 ? 's' : ''}</span>
-      </div>
-
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>Loading…</div>
+        <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8', fontSize: '0.85rem' }}>Loading…</div>
       ) : jobs.length === 0 ? (
-        <div className="sh-card" style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
+        <div className="sh-card" style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem' }}>
           No manifest jobs found.
         </div>
       ) : (
         <div className="sh-card" style={{ overflow: 'hidden' }}>
-          <table className="sh-table">
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr>
-                <th>Job ID</th>
-                <th>Carrier</th>
-                <th>Labels</th>
-                <th>Amount Paid</th>
-                <th>Status</th>
-                <th>Vendor</th>
-                <th>Date</th>
-                <th>Actions</th>
+              <tr style={{ borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                <th style={th}>Job ID</th>
+                <th style={th}>Carrier</th>
+                <th style={th}>Labels</th>
+                <th style={th}>Paid</th>
+                <th style={th}>Status</th>
+                <th style={th}>Vendor</th>
+                <th style={th}>Date</th>
+                <th style={th}>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {jobs.map((job: any) => {
+              {jobs.map((job: any, idx: number) => {
                 const sm = STATUS_META[job.status] || { label: job.status, color: '#64748b', bg: '#f1f5f9' };
                 const canCancel   = CANCELLABLE.includes(job.status);
                 const canDownload = job.status === 'completed';
                 return (
-                  <tr key={job._id}>
-                    <td style={{ fontFamily: 'monospace', fontSize: '0.75rem', color: '#475569' }}>
+                  <tr key={job._id} style={{ borderBottom: '1px solid #f1f5f9', background: idx % 2 === 0 ? '#fff' : '#fafafa' }}>
+                    <td style={{ ...td, fontFamily: 'monospace', color: '#475569' }}>
                       {job._id.slice(-8).toUpperCase()}
                     </td>
-                    <td><span className="carrier-badge usps">{job.carrier}</span></td>
-                    <td style={{ fontWeight: 600 }}>
+                    <td style={td}>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: '#004b87', color: '#fff' }}>
+                        {job.carrier}
+                      </span>
+                    </td>
+                    <td style={{ ...td, fontWeight: 600, textAlign: 'center' }}>
                       {job.requestFile?.labelCount ?? job.userBilling?.labelCount ?? '—'}
                     </td>
-                    <td style={{ fontWeight: 600, color: '#dc2626', fontSize: '0.85rem' }}>
+                    <td style={{ ...td, fontWeight: 600, color: '#dc2626' }}>
                       ${(job.userBilling?.totalAmount ?? 0).toFixed(2)}
                     </td>
-                    <td>
+                    <td style={td}>
                       <span style={{
-                        display: 'inline-block', padding: '3px 8px', borderRadius: 99,
-                        fontSize: '0.7rem', fontWeight: 600,
-                        background: sm.bg, color: sm.color,
+                        display: 'inline-block', padding: '2px 7px', borderRadius: 99,
+                        fontSize: '0.65rem', fontWeight: 600,
+                        background: sm.bg, color: sm.color, whiteSpace: 'nowrap',
                       }}>
                         {sm.label}
                       </span>
                     </td>
-                    <td style={{ fontSize: '0.82rem', color: '#475569' }}>
+                    <td style={{ ...td, color: '#475569', maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {job.vendor?.name ?? '—'}
                     </td>
-                    <td style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                    <td style={{ ...td, color: '#64748b', whiteSpace: 'nowrap' }}>
                       {new Date(job.createdAt).toLocaleDateString()}
                     </td>
-                    <td>
-                      <div style={{ display: 'flex', gap: 6 }}>
+                    <td style={{ ...td }}>
+                      <div style={{ display: 'flex', gap: 4 }}>
                         {canDownload && (
-                          <button
-                            onClick={() => handleDownload(job._id)}
-                            className="btn btn-success btn-sm"
-                            title="Download labels"
-                            style={{ padding: '4px 8px' }}
-                          >
-                            <ArrowDownTrayIcon style={{ width: 14, height: 14 }} />
+                          <button onClick={() => handleDownload(job._id)}
+                            className="btn btn-success btn-sm" title="Download labels"
+                            style={{ padding: '3px 7px' }}>
+                            <ArrowDownTrayIcon style={{ width: 13, height: 13 }} />
                           </button>
                         )}
                         {canCancel && (
-                          <button
-                            onClick={() => handleCancel(job._id)}
+                          <button onClick={() => handleCancel(job._id)}
                             disabled={cancelling === job._id}
-                            className="btn btn-ghost btn-sm"
-                            title="Cancel job"
-                            style={{ padding: '4px 8px', color: '#dc2626' }}
-                          >
-                            <XMarkIcon style={{ width: 14, height: 14 }} />
+                            className="btn btn-ghost btn-sm" title="Cancel job"
+                            style={{ padding: '3px 7px', color: '#dc2626' }}>
+                            <XMarkIcon style={{ width: 13, height: 13 }} />
                           </button>
                         )}
                         {!canDownload && !canCancel && (
-                          <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>—</span>
+                          <span style={{ color: '#cbd5e1', fontSize: '0.75rem' }}>—</span>
                         )}
                       </div>
                     </td>
@@ -192,9 +178,9 @@ const ManifestHistory: React.FC = () => {
           </table>
 
           {pages > 1 && (
-            <div style={{ display: 'flex', justifyContent: 'center', gap: 8, padding: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 6, padding: '0.6rem' }}>
               <button disabled={page === 1}     onClick={() => setPage(p => p - 1)} className="btn btn-ghost btn-sm">Prev</button>
-              <span style={{ lineHeight: '32px', fontSize: '0.85rem', color: '#64748b' }}>{page} / {pages}</span>
+              <span style={{ lineHeight: '28px', fontSize: '0.78rem', color: '#64748b' }}>{page} / {pages}</span>
               <button disabled={page === pages} onClick={() => setPage(p => p + 1)} className="btn btn-ghost btn-sm">Next</button>
             </div>
           )}
