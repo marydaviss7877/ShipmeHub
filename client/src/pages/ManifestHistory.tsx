@@ -135,7 +135,7 @@ const ManifestHistory: React.FC = () => {
                       </span>
                     </td>
                     <td style={{ fontSize: '0.82rem', color: '#475569' }}>
-                      {job.assignedVendor?.name ?? '—'}
+                      {job.vendor?.name ?? '—'}
                     </td>
                     <td style={{ fontSize: '0.78rem', color: '#64748b' }}>
                       {new Date(job.createdAt).toLocaleDateString()}
