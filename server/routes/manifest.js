@@ -57,6 +57,22 @@ async function calculateCost(rows, userId, vendorId, carrier) {
 
   if (!vendor) throw new Error('Vendor not found');
 
+  // Weight range validation — enforce when user has rate tiers configured
+  if (access && access.rateTiers && access.rateTiers.length > 0) {
+    const outOfRange = rows
+      .map((r, i) => ({ row: i + 1, weight: parseFloat(r.weight) || 0 }))
+      .filter(({ weight }) => access.getRateForWeight(weight) === null);
+    if (outOfRange.length > 0) {
+      const ranges = access.rateTiers
+        .map(t => t.maxLbs === null ? `${t.minLbs}+ lbs` : `${t.minLbs}–${t.maxLbs} lbs`)
+        .join(', ');
+      const err = new Error(`${outOfRange.length} row(s) have weight outside the allowed range (${ranges}).`);
+      err.status = 400;
+      err.invalidRows = outOfRange;
+      throw err;
+    }
+  }
+
   const buckets = {}; // key = rate value
   let total = 0;
 
@@ -206,8 +222,11 @@ router.post('/', authenticateToken, upload.single('file'), async (req, res) => {
     });
   } catch (err) {
     if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
-    console.error('Manifest submit error:', err);
-    res.status(500).json({ message: err.message || 'Server error submitting manifest' });
+    if (err.status !== 400) console.error('Manifest submit error:', err);
+    res.status(err.status || 500).json({
+      message: err.message || 'Server error submitting manifest',
+      ...(err.invalidRows ? { invalidRows: err.invalidRows } : {}),
+    });
   }
 });
 

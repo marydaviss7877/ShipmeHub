@@ -86,6 +86,20 @@ router.post('/single', authenticateToken, [
     }
 
     const weight = parseFloat(labelFields.weight);
+
+    // Weight range validation — enforce when user has rate tiers configured
+    if (!isAdmin && access.rateTiers && access.rateTiers.length > 0) {
+      const matched = access.getRateForWeight(weight);
+      if (matched === null) {
+        const ranges = access.rateTiers
+          .map(t => t.maxLbs === null ? `${t.minLbs}+ lbs` : `${t.minLbs}–${t.maxLbs} lbs`)
+          .join(', ');
+        return res.status(400).json({
+          message: `Weight ${weight} lbs is outside your allowed range. Allowed: ${ranges}.`,
+        });
+      }
+    }
+
     const tierRate = isAdmin ? null : access.getRateForWeight(weight);
     const effectiveRate = tierRate !== null && tierRate !== undefined ? tierRate : vendor.rate;
 
@@ -209,6 +223,22 @@ router.post('/bulk', authenticateToken, [
     const access  = isAdmin ? null : await UserVendorAccess.findOne({ user: req.user._id, vendor: vendorId });
     if (!isAdmin && (!access || !access.isAllowed)) {
       return res.status(403).json({ message: 'You are not allowed to use this vendor' });
+    }
+
+    // Weight range validation — enforce when user has rate tiers configured
+    if (!isAdmin && access.rateTiers && access.rateTiers.length > 0) {
+      const outOfRange = labelRows
+        .map((r, i) => ({ row: i + 1, weight: parseFloat(r.weight) || 0 }))
+        .filter(({ weight }) => access.getRateForWeight(weight) === null);
+      if (outOfRange.length > 0) {
+        const ranges = access.rateTiers
+          .map(t => t.maxLbs === null ? `${t.minLbs}+ lbs` : `${t.minLbs}–${t.maxLbs} lbs`)
+          .join(', ');
+        return res.status(400).json({
+          message: `${outOfRange.length} row(s) have weight outside your allowed range (${ranges}).`,
+          invalidRows: outOfRange,
+        });
+      }
     }
 
     // Effective rate helper
