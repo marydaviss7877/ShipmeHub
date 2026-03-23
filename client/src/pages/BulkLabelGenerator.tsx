@@ -341,7 +341,7 @@ const BulkLabelGenerator: React.FC = () => {
 
       <div style={{ display: 'flex', gap: '0.75rem' }}>
         <button className="btn btn-ghost" onClick={reset}>Submit Another Batch</button>
-        <button className="btn btn-primary" onClick={() => navigate('/labels/bulk')}>
+        <button className="btn btn-primary" onClick={reset}>
           <ClipboardDocumentListIcon style={{ width: 16, height: 16 }} /> Submit Another
         </button>
       </div>
