@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
-import { ArrowDownTrayIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
+import { ArrowDownTrayIcon, ArrowPathIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
 const API = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
 
@@ -17,15 +17,20 @@ const STATUS_META: Record<string, { label: string; color: string; bg: string }> 
   rejected:     { label: 'Rejected',       color: '#ea580c', bg: '#fff7ed' },
 };
 
+const CANCELLABLE = ['open', 'pending', 'assigned'];
+
 const ManifestHistory: React.FC = () => {
   const { token } = useAuth() as any;
-  const [jobs,    setJobs]    = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [page,    setPage]    = useState(1);
-  const [pages,   setPages]   = useState(1);
-  const [total,   setTotal]   = useState(0);
-  const [statusF, setStatusF] = useState('');
-  const [carrierF,setCarrierF]= useState('');
+  const [jobs,       setJobs]       = useState<any[]>([]);
+  const [loading,    setLoading]    = useState(true);
+  const [page,       setPage]       = useState(1);
+  const [pages,      setPages]      = useState(1);
+  const [total,      setTotal]      = useState(0);
+  const [statusF,    setStatusF]    = useState('');
+  const [carrierF,   setCarrierF]   = useState('');
+  const [cancelling, setCancelling] = useState<string | null>(null);
+
+  const authH = { Authorization: `Bearer ${token}` };
 
   const fetchJobs = useCallback(async () => {
     setLoading(true);
@@ -33,21 +38,31 @@ const ManifestHistory: React.FC = () => {
       const params: any = { page, limit: 15 };
       if (statusF)  params.status  = statusF;
       if (carrierF) params.carrier = carrierF;
-      const { data } = await axios.get(`${API}/manifest`, {
-        headers: { Authorization: `Bearer ${token}` },
-        params,
-      });
+      const { data } = await axios.get(`${API}/manifest`, { headers: authH, params });
       setJobs(data.jobs);
       setPages(data.pages);
       setTotal(data.total);
     } catch { /* ignore */ }
     setLoading(false);
-  }, [token, page, statusF, carrierF]);
+  }, [token, page, statusF, carrierF]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { fetchJobs(); }, [fetchJobs]);
 
   const handleDownload = (jobId: string) => {
     window.open(`${API}/manifest/${jobId}/download?token=${token}`, '_blank');
+  };
+
+  const handleCancel = async (jobId: string) => {
+    if (!window.confirm('Cancel this job? Your balance will be refunded.')) return;
+    setCancelling(jobId);
+    try {
+      await axios.patch(`${API}/manifest/${jobId}/cancel`, {}, { headers: authH });
+      fetchJobs();
+    } catch (err: any) {
+      alert(err?.response?.data?.message || 'Failed to cancel job');
+    } finally {
+      setCancelling(null);
+    }
   };
 
   return (
@@ -107,12 +122,14 @@ const ManifestHistory: React.FC = () => {
                 <th>Status</th>
                 <th>Vendor</th>
                 <th>Date</th>
-                <th>Download</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {jobs.map((job: any) => {
                 const sm = STATUS_META[job.status] || { label: job.status, color: '#64748b', bg: '#f1f5f9' };
+                const canCancel   = CANCELLABLE.includes(job.status);
+                const canDownload = job.status === 'completed';
                 return (
                   <tr key={job._id}>
                     <td style={{ fontFamily: 'monospace', fontSize: '0.75rem', color: '#475569' }}>
@@ -141,18 +158,32 @@ const ManifestHistory: React.FC = () => {
                       {new Date(job.createdAt).toLocaleDateString()}
                     </td>
                     <td>
-                      {job.status === 'completed' ? (
-                        <button
-                          onClick={() => handleDownload(job._id)}
-                          className="btn btn-success btn-sm"
-                          title="Download labels"
-                          style={{ padding: '4px 8px' }}
-                        >
-                          <ArrowDownTrayIcon style={{ width: 14, height: 14 }} />
-                        </button>
-                      ) : (
-                        <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>—</span>
-                      )}
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        {canDownload && (
+                          <button
+                            onClick={() => handleDownload(job._id)}
+                            className="btn btn-success btn-sm"
+                            title="Download labels"
+                            style={{ padding: '4px 8px' }}
+                          >
+                            <ArrowDownTrayIcon style={{ width: 14, height: 14 }} />
+                          </button>
+                        )}
+                        {canCancel && (
+                          <button
+                            onClick={() => handleCancel(job._id)}
+                            disabled={cancelling === job._id}
+                            className="btn btn-ghost btn-sm"
+                            title="Cancel job"
+                            style={{ padding: '4px 8px', color: '#dc2626' }}
+                          >
+                            <XMarkIcon style={{ width: 14, height: 14 }} />
+                          </button>
+                        )}
+                        {!canDownload && !canCancel && (
+                          <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>—</span>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
