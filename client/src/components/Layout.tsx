@@ -85,6 +85,16 @@ const Layout: React.FC = () => {
   const { user, logout } = useAuth();
   const location         = useLocation();
   const navigate         = useNavigate();
+  const [balance, setBalance] = useState<number | null>(null);
+
+  // Fetch balance
+  useEffect(() => {
+    if (!user) return;
+    const token = localStorage.getItem('token');
+    axios.get(`${API_BASE}/stats/user`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(res => setBalance(res.data?.balance?.currentBalance ?? 0))
+      .catch(() => {});
+  }, [user]);
 
   // Persist collapse state + sync CSS variables
   useEffect(() => {
@@ -587,11 +597,11 @@ const Layout: React.FC = () => {
             <div style={{ width: 1, height: 24, background: 'var(--navy-100)' }} />
 
             {/* User chip */}
-            <div className="topbar-user-chip">
+            <div className="topbar-user-chip" style={{ cursor: 'default' }}>
               <div className="avatar avatar-sm avatar-indigo">{initials}</div>
               <div style={{ lineHeight: 1.3 }}>
-                <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--navy-900)' }}>
-                  {user?.firstName} {user?.lastName}
+                <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#059669' }}>
+                  {balance === null ? '—' : `$${balance.toFixed(2)}`}
                 </div>
                 <div style={{ fontSize: '0.67rem', color: 'var(--navy-500)', textTransform: 'capitalize' }}>
                   {user?.role}
