@@ -91,7 +91,7 @@ const Layout: React.FC = () => {
   useEffect(() => {
     if (!user) return;
     const token = localStorage.getItem('token');
-    axios.get(`${API_BASE}/stats/user`, { headers: { Authorization: `Bearer ${token}` } })
+    axios.get(`${API_BASE}/balance`, { headers: { Authorization: `Bearer ${token}` } })
       .then(res => setBalance(res.data?.balance?.currentBalance ?? 0))
       .catch(() => {});
   }, [user]);
