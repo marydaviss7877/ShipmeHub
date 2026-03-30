@@ -145,7 +145,7 @@ export default function AttendanceAdmin() {
   const [tab,   setTab]     = useState<'today' | 'salary' | 'calendar' | 'config'>('today');
 
   // Config
-  const [config, setConfig]         = useState<AttendanceConfig>(defaultConfig);
+  const [_config, setConfig]         = useState<AttendanceConfig>(defaultConfig);
   const [configDraft, setConfigDraft] = useState<AttendanceConfig>(defaultConfig);
   const [configSaving, setConfigSaving] = useState(false);
   const [newIP, setNewIP]           = useState('');
@@ -155,7 +155,7 @@ export default function AttendanceAdmin() {
   const [todayData, setTodayData]   = useState<AgentToday[]>([]);
   const [todayLoading, setTodayLoading] = useState(false);
   const [markingId, setMarkingId]   = useState('');
-  const [markNote, setMarkNote]     = useState('');
+  const [_markNote, setMarkNote]     = useState('');
 
   // Salary
   const [salaryData, setSalaryData] = useState<AgentSalary[]>([]);

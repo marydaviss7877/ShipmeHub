@@ -31,7 +31,7 @@ interface ModalState {
 const emptyForm = { name: '', email: '', password: '' };
 
 export default function Settings() {
-  const { user, token } = useAuth();
+  const { token } = useAuth();
   const [accounts, setAccounts]   = useState<Account[]>([]);
   const [loading, setLoading]     = useState(true);
   const [modal, setModal]         = useState<ModalState>({ open: false, mode: 'add', account: null });
