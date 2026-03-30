@@ -195,7 +195,18 @@ router.post('/single', authenticateToken, [
 
   } catch (error) {
     console.error('Generate single label error:', error);
-    res.status(500).json({ message: error.message || 'Server error generating label' });
+    // ShippersHub API errors are downstream failures, not server crashes — return 400
+    const isShippersHubError = error.message && (
+      error.message.includes('ShippersHub') ||
+      error.message.includes('carrier') ||
+      error.message.includes('vendor') ||
+      error.message.includes('label') ||
+      error.message.includes('token') ||
+      error.message.includes('Invalid') ||
+      error.message.includes('not found') ||
+      error.message.includes('Unauthorized')
+    );
+    res.status(isShippersHubError ? 400 : 500).json({ message: error.message || 'Server error generating label' });
   }
 });
 

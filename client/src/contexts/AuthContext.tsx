@@ -187,11 +187,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const login = async (email: string, password: string) => {
     try {
       dispatch({ type: 'AUTH_START' });
-      console.log('Attempting login with:', { email, password });
-      console.log('API URL:', API_URL);
-
       const response = await axios.post('/auth/login', { email, password });
-      console.log('Login response:', response.data);
 
       const { token, user } = response.data;
       localStorage.setItem('token', token);

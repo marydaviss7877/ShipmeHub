@@ -477,7 +477,7 @@ router.get('/export', authorize('admin'), async (req, res) => {
       r.clientRate.toFixed(3),
       r.totalAmountUSD.toFixed(2),
       r.paidByClientUSD.toFixed(2),
-      r.totalAmountUSD.toFixed(2),
+      Math.max(0, r.totalAmountUSD - r.paidByClientUSD).toFixed(2),
       r.differenceUSD.toFixed(2),
       Math.round(r.totalAmountUSD  * pkrRate),
       Math.round(r.paidByClientUSD * pkrRate),

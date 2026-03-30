@@ -57,6 +57,17 @@ async function isSalesAgentClient(userId) {
   return !!profile;
 }
 
+// ── GET /api/payment-logs/screenshot/:filename ────────────────
+// Serve screenshot files — no auth required (filenames are random UUIDs)
+// IMPORTANT: must be defined BEFORE /:userId to avoid route shadowing
+router.get('/screenshot/:filename', (req, res) => {
+  // Sanitise: strip any path traversal
+  const filename = path.basename(req.params.filename);
+  const filePath = path.join(screenshotsDir, filename);
+  if (!fs.existsSync(filePath)) return res.status(404).json({ message: 'File not found' });
+  res.sendFile(filePath);
+});
+
 // ── GET /api/payment-logs/:userId ─────────────────────────────
 // Returns all payment logs + total paid for a user + isSalesAgentClient flag
 router.get('/:userId', authenticateToken, authorize('admin', 'reseller'), async (req, res) => {
@@ -187,16 +198,6 @@ router.delete('/:id', authenticateToken, authorize('admin', 'reseller'), async (
     console.error('Delete payment log error:', err);
     res.status(500).json({ message: 'Server error' });
   }
-});
-
-// ── GET /api/payment-logs/screenshot/:filename ────────────────
-// Serve screenshot files — no auth required (filenames are random UUIDs)
-router.get('/screenshot/:filename', (req, res) => {
-  // Sanitise: strip any path traversal
-  const filename = path.basename(req.params.filename);
-  const filePath = path.join(screenshotsDir, filename);
-  if (!fs.existsSync(filePath)) return res.status(404).json({ message: 'File not found' });
-  res.sendFile(filePath);
 });
 
 module.exports = router;

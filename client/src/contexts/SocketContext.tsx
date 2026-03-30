@@ -16,7 +16,11 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   useEffect(() => {
     if (isAuthenticated && user) {
-      const newSocket = io(process.env.REACT_APP_API_URL || 'http://localhost:5000', {
+      // Strip the /api path — Socket.IO connects to the base server URL only,
+      // not the REST API prefix (which would be treated as a namespace).
+      const apiUrl   = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+      const serverUrl = apiUrl.replace(/\/api\/?$/, '');
+      const newSocket = io(serverUrl, {
         transports: ['websocket'],
         autoConnect: true,
       });

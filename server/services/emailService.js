@@ -1,17 +1,25 @@
 const nodemailer = require('nodemailer');
 
-const transporter = nodemailer.createTransport({
-  host:   process.env.EMAIL_HOST  || 'smtp.gmail.com',
-  port:   parseInt(process.env.EMAIL_PORT) || 587,
-  secure: false,
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+// Lazy — transporter is created on first use, not at require() time
+let _transporter = null;
+function getTransporter() {
+  if (!_transporter) {
+    _transporter = nodemailer.createTransport({
+      host:   process.env.EMAIL_HOST  || 'smtp.gmail.com',
+      port:   parseInt(process.env.EMAIL_PORT) || 587,
+      secure: false,
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+  }
+  return _transporter;
+}
 
 const sendEmail = async ({ to, subject, html }) => {
   try {
+    const transporter = getTransporter();
     await transporter.sendMail({
       from: `"Label Portal" <${process.env.EMAIL_USER}>`,
       to,

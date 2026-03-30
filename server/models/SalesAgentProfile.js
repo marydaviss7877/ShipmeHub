@@ -95,7 +95,6 @@ const salesAgentProfileSchema = new mongoose.Schema({
   timestamps: true,
 });
 
-salesAgentProfileSchema.index({ user: 1 });
 salesAgentProfileSchema.index({ isActive: 1 });
 
 module.exports = mongoose.model('SalesAgentProfile', salesAgentProfileSchema);

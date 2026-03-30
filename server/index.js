@@ -1,3 +1,6 @@
+const startTime = Date.now();
+console.log('⏳ Starting ShipmeHub server…');
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -31,12 +34,19 @@ const expenseCategoryRoutes    = require('./routes/expenseCategories');
 const cashbookRoutes           = require('./routes/cashbook');
 const equityPartnerRoutes      = require('./routes/equityPartners');
 const financialDashboardRoutes = require('./routes/financialDashboard');
+const attendanceRoutes              = require('./routes/attendance');
+const shippershubAccountRoutes      = require('./routes/shippershubAccounts');
 
 const app = express();
 const server = createServer(app);
+
+const allowedOrigins = process.env.CLIENT_URL
+  ? [process.env.CLIENT_URL]
+  : ['http://localhost:3000', 'http://localhost:3001'];
+
 const io = new Server(server, {
   cors: {
-    origin: process.env.CLIENT_URL || 'http://localhost:3000',
+    origin: allowedOrigins,
     methods: ['GET', 'POST']
   }
 });
@@ -44,7 +54,7 @@ const io = new Server(server, {
 // Security middleware
 app.use(helmet());
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:3000',
+  origin: allowedOrigins,
   credentials: true
 }));
 
@@ -97,6 +107,8 @@ app.use('/api/expense-categories',    expenseCategoryRoutes);
 app.use('/api/cashbook',              cashbookRoutes);
 app.use('/api/equity-partners',       equityPartnerRoutes);
 app.use('/api/financial-dashboard',   financialDashboardRoutes);
+app.use('/api/attendance',            attendanceRoutes);
+app.use('/api/shippershub-accounts',  shippershubAccountRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -164,7 +176,11 @@ const PORT = process.env.PORT || 5001;
 
 const connectDB = async () => {
   try {
-    const conn = await mongoose.connect(process.env.MONGODB_URI);
+    console.log('⏳ Connecting to MongoDB…');
+    const conn = await mongoose.connect(process.env.MONGODB_URI, {
+      serverSelectionTimeoutMS: 8000,
+      connectTimeoutMS: 8000,
+    });
     console.log(`✅ MongoDB connected: ${conn.connection.host}`);
   } catch (err) {
     console.error('❌ MongoDB connection failed:', err.message);
@@ -172,9 +188,56 @@ const connectDB = async () => {
   }
 };
 
-connectDB().then(() => {
+// Auto-seed ShippersHub account from .env if DB has none yet
+async function seedShippersHubAccount() {
+  try {
+    const ShippersHubAccount = require('./models/ShippersHubAccount');
+    const count = await ShippersHubAccount.countDocuments();
+    if (count > 0) return; // already have accounts, skip
+
+    const email    = process.env.SHIPPERSHUB_EMAIL;
+    const password = process.env.SHIPPERSHUB_PASSWORD;
+    if (!email || !password) return; // no env creds to migrate
+
+    const account = new ShippersHubAccount({ name: 'Default Account', email, encryptedPassword: '', iv: '', isActive: true });
+    account.setPassword(password);
+    await account.save();
+    console.log(`✅ ShippersHub default account seeded from .env (${email})`);
+  } catch (err) {
+    console.warn('⚠️  Could not seed ShippersHub account:', err.message);
+  }
+}
+
+connectDB().then(async () => {
+  await seedShippersHubAccount();
+
   server.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`🚀 Server running on port ${PORT} (started in ${Date.now() - startTime}ms)`);
     console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  });
+
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`❌ Port ${PORT} is already in use. Killing the old process and retrying…`);
+      const { execSync } = require('child_process');
+      try {
+        if (process.platform === 'win32') {
+          const result = execSync(`netstat -ano | findstr :${PORT}`, { encoding: 'utf8' });
+          const lines = result.trim().split('\n');
+          const pids = [...new Set(lines.map(l => l.trim().split(/\s+/).pop()).filter(p => p && p !== '0'))];
+          pids.forEach(pid => { try { execSync(`taskkill /F /PID ${pid}`); } catch (_) {} });
+        } else {
+          execSync(`fuser -k ${PORT}/tcp`);
+        }
+      } catch (_) {}
+      setTimeout(() => {
+        server.close();
+        server.listen(PORT, () => {
+          console.log(`🚀 Server running on port ${PORT} (restarted)`);
+        });
+      }, 1000);
+    } else {
+      throw err;
+    }
   });
 });

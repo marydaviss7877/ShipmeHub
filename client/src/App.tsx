@@ -33,6 +33,7 @@ import CashBook            from './pages/CashBook';
 import FinancialDashboard  from './pages/FinancialDashboard';
 import AttendanceCheckIn  from './pages/AttendanceCheckIn';
 import AttendanceAdmin    from './pages/AttendanceAdmin';
+import Settings           from './pages/Settings';
 import './App.css';
 
 function App() {
@@ -90,6 +91,7 @@ function App() {
                   <Route path="admin/cashbook"               element={<CashBook />} />
                   <Route path="admin/financial-dashboard"    element={<FinancialDashboard />} />
                   <Route path="admin/attendance"             element={<AttendanceAdmin />} />
+                  <Route path="admin/settings"              element={<Settings />} />
 
                   {/* Sales agent self check-in */}
                   <Route path="attendance" element={<AttendanceCheckIn />} />

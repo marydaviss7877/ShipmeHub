@@ -1,7 +1,9 @@
 /**
  * ShippersHub API Service
  * Proxies all calls to https://api.shippershub.com
- * Token is cached in memory and refreshed automatically
+ * Token is cached in memory and refreshed automatically.
+ * Credentials are read from the active ShippersHubAccount in the DB,
+ * falling back to SHIPPERSHUB_EMAIL / SHIPPERSHUB_PASSWORD env vars.
  */
 const https = require('https');
 const fs    = require('fs');
@@ -93,18 +95,35 @@ function apiRequestBinary(method, urlPath, data = null, token = null) {
   });
 }
 
+// ── Credential resolution ─────────────────────────────────────
+// Lazily require the model to avoid circular-dependency issues at startup.
+async function getCredentials() {
+  try {
+    const ShippersHubAccount = require('../models/ShippersHubAccount');
+    const active = await ShippersHubAccount.findOne({ isActive: true });
+    if (active) {
+      return { email: active.email, password: active.getPassword() };
+    }
+  } catch (_) {
+    // DB not ready yet or model not found — fall through to env vars
+  }
+
+  // Fallback to .env
+  const email    = process.env.SHIPPERSHUB_EMAIL;
+  const password = process.env.SHIPPERSHUB_PASSWORD;
+  if (!email || !password) {
+    throw new Error('No active ShippersHub account configured. Add one in Settings or set SHIPPERSHUB_EMAIL / SHIPPERSHUB_PASSWORD in .env');
+  }
+  return { email, password };
+}
+
 // ── Auth ──────────────────────────────────────────────────────
 async function getToken() {
   if (_cachedToken && _tokenExpiry && Date.now() < _tokenExpiry - 10 * 60 * 1000) {
     return _cachedToken;
   }
 
-  const email    = process.env.SHIPPERSHUB_EMAIL;
-  const password = process.env.SHIPPERSHUB_PASSWORD;
-
-  if (!email || !password) {
-    throw new Error('SHIPPERSHUB_EMAIL and SHIPPERSHUB_PASSWORD must be set in .env');
-  }
+  const { email, password } = await getCredentials();
 
   const res = await apiRequest('POST', '/auth/login', { email, password });
   _cachedToken = res.data?.token;
@@ -112,6 +131,14 @@ async function getToken() {
 
   if (!_cachedToken) throw new Error('ShippersHub login failed — no token in response');
   return _cachedToken;
+}
+
+// ── Test credentials without affecting the cached token ───────
+async function testCredentials(email, password) {
+  const res = await apiRequest('POST', '/auth/login', { email, password });
+  const token = res.data?.token;
+  if (!token) throw new Error('Login succeeded but no token returned');
+  return true;
 }
 
 // ── Carriers ──────────────────────────────────────────────────
@@ -208,4 +235,4 @@ function clearToken() {
   _tokenExpiry  = null;
 }
 
-module.exports = { getToken, getMyCarriers, getMyVendors, createSingleLabel, getRecentLabels, clearToken };
+module.exports = { getToken, getMyCarriers, getMyVendors, createSingleLabel, getRecentLabels, clearToken, testCredentials };

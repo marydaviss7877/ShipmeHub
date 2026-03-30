@@ -23,6 +23,7 @@ import {
   ChevronDownIcon,
   BellIcon,
   MegaphoneIcon,
+  Cog6ToothIcon,
 } from '@heroicons/react/24/outline';
 
 // ── Announcement types ────────────────────────────────────────────────────────
@@ -199,6 +200,7 @@ const Layout: React.FC = () => {
     { name: 'Cash Book',           href: '/admin/cashbook',            icon: BookOpenIcon,              current: location.pathname === '/admin/cashbook' },
     { name: 'Financial Dashboard', href: '/admin/financial-dashboard', icon: PresentationChartLineIcon, current: location.pathname === '/admin/financial-dashboard' },
     { name: 'Attendance',          href: '/admin/attendance',          icon: ClipboardDocumentListIcon,  current: location.pathname === '/admin/attendance' },
+    { name: 'Settings',            href: '/admin/settings',            icon: Cog6ToothIcon,               current: location.pathname === '/admin/settings' },
   ] : user?.role === 'reseller' ? [
     { name: 'My Clients', href: '/reseller/clients', icon: UserGroupIcon, current: location.pathname.startsWith('/reseller/clients') },
     { name: 'Finance',    href: '/reseller/finance', icon: BanknotesIcon, current: location.pathname === '/reseller/finance' },
