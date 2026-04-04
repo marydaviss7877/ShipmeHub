@@ -2,10 +2,24 @@ const mongoose = require('mongoose');
 const crypto   = require('crypto');
 
 // ── Encryption helpers ────────────────────────────────────────────────────────
-// Derives a 32-byte AES key from JWT_SECRET so no extra env var is needed.
+// Uses a dedicated ENCRYPTION_KEY env var, separate from JWT_SECRET.
+// Falls back to JWT_SECRET with a deprecation warning so existing deployments
+// continue to work; set ENCRYPTION_KEY to rotate to a proper dedicated secret.
 function getKey() {
-  const secret = process.env.JWT_SECRET || 'fallback-secret-change-in-prod';
-  return crypto.scryptSync(secret, 'shippershub-salt', 32);
+  const raw = process.env.ENCRYPTION_KEY || process.env.JWT_SECRET;
+  if (!raw) {
+    throw new Error(
+      'Neither ENCRYPTION_KEY nor JWT_SECRET is set. ' +
+      'Set ENCRYPTION_KEY (preferred) to enable credential encryption.'
+    );
+  }
+  if (!process.env.ENCRYPTION_KEY && process.env.JWT_SECRET) {
+    console.warn(
+      '[ShippersHubAccount] ENCRYPTION_KEY is not set — falling back to JWT_SECRET. ' +
+      'Set a dedicated ENCRYPTION_KEY in your .env file.'
+    );
+  }
+  return crypto.scryptSync(raw, 'shippershub-credential-salt-v1', 32);
 }
 
 function encrypt(plainText) {

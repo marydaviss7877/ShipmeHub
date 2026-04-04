@@ -1,33 +1,47 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
-const User = require('../models/User');
+const User    = require('../models/User');
 const Balance = require('../models/Balance');
-const Rate = require('../models/Rate');
+const Rate    = require('../models/Rate');
 const { authenticateToken, authorize } = require('../middleware/auth');
 
 const router = express.Router();
 
+// ── Helpers ───────────────────────────────────────────────────
+
+/** Escape special regex characters to prevent ReDoS attacks */
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** Maximum length for search strings */
+const SEARCH_MAX_LEN = 100;
+
+/** Maximum results per page */
+const PAGE_LIMIT_MAX = 100;
+
 // ── GET /api/users ────────────────────────────────────────────
-// Get all users (admin only)
 router.get('/', authenticateToken, authorize('admin'), async (req, res) => {
   try {
-    const { role, isActive, page = 1, limit = 10, search } = req.query;
+    const { role, isActive, page = 1, search } = req.query;
+    const limit = Math.min(parseInt(req.query.limit) || 10, PAGE_LIMIT_MAX);
 
     const filter = {};
     if (role) filter.role = role;
     if (isActive !== undefined) filter.isActive = isActive === 'true';
-    if (search) {
+    if (search && search.length <= SEARCH_MAX_LEN) {
+      const safe = escapeRegex(search);
       filter.$or = [
-        { firstName: { $regex: search, $options: 'i' } },
-        { lastName:  { $regex: search, $options: 'i' } },
-        { email:     { $regex: search, $options: 'i' } }
+        { firstName: { $regex: safe, $options: 'i' } },
+        { lastName:  { $regex: safe, $options: 'i' } },
+        { email:     { $regex: safe, $options: 'i' } }
       ];
     }
 
     const total = await User.countDocuments(filter);
     const users = await User.find(filter)
       .skip((page - 1) * limit)
-      .limit(parseInt(limit))
+      .limit(limit)
       .select('-password');
 
     res.json({
@@ -43,7 +57,6 @@ router.get('/', authenticateToken, authorize('admin'), async (req, res) => {
 });
 
 // ── GET /api/users/reseller/clients ───────────────────────────
-// Get the logged-in reseller's client list
 router.get('/reseller/clients', authenticateToken, authorize('admin', 'reseller'), async (req, res) => {
   try {
     const user = await User.findById(req.user._id).populate('clients', '-password');
@@ -55,12 +68,11 @@ router.get('/reseller/clients', authenticateToken, authorize('admin', 'reseller'
 });
 
 // ── POST /api/users/reseller/clients ──────────────────────────
-// Create a new client user under the logged-in reseller
 router.post('/reseller/clients', authenticateToken, authorize('admin', 'reseller'), [
   body('firstName').trim().notEmpty().withMessage('First name is required'),
   body('lastName').trim().notEmpty().withMessage('Last name is required'),
   body('email').isEmail().normalizeEmail().withMessage('Please provide a valid email'),
-  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  body('password').isLength({ min: 12 }).withMessage('Password must be at least 12 characters'),
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -90,7 +102,6 @@ router.post('/reseller/clients', authenticateToken, authorize('admin', 'reseller
 });
 
 // ── DELETE /api/users/reseller/clients/:clientId ──────────────
-// Remove and delete a client from the logged-in reseller
 router.delete('/reseller/clients/:clientId', authenticateToken, authorize('admin', 'reseller'), async (req, res) => {
   try {
     const { clientId } = req.params;
@@ -116,7 +127,7 @@ router.delete('/reseller/clients/:clientId', authenticateToken, authorize('admin
 // ── GET /api/users/:id ────────────────────────────────────────
 router.get('/:id', authenticateToken, async (req, res) => {
   try {
-    const isSelf = req.user._id.toString() === req.params.id;
+    const isSelf  = req.user._id.toString() === req.params.id;
     const isAdmin = req.user.role === 'admin';
     let isResellerClient = false;
     if (req.user.role === 'reseller') {
@@ -143,7 +154,7 @@ router.post('/', authenticateToken, authorize('admin'), [
   body('firstName').trim().notEmpty().withMessage('First name is required'),
   body('lastName').trim().notEmpty().withMessage('Last name is required'),
   body('email').isEmail().normalizeEmail().withMessage('Please provide a valid email'),
-  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  body('password').isLength({ min: 12 }).withMessage('Password must be at least 12 characters'),
   body('role').isIn(['admin', 'reseller', 'user']).withMessage('Invalid role')
 ], async (req, res) => {
   try {
@@ -161,13 +172,12 @@ router.post('/', authenticateToken, authorize('admin'), [
 
     const user = await User.create({ firstName, lastName, email, password, role, source: source || null });
 
-    // Auto-create balance and rate for new user
     await Balance.create({ user: user._id, currentBalance: 0, transactions: [] });
     await Rate.create({
       user: user._id,
       labelRate: 1.00,
       setBy: req.user._id,
-      notes: `Default rate set by admin`
+      notes: 'Default rate set by admin'
     });
 
     res.status(201).json({ message: 'User created successfully', user });
@@ -183,7 +193,8 @@ router.put('/:id', authenticateToken, [
   body('lastName').optional().trim().notEmpty().withMessage('Last name cannot be empty'),
   body('email').optional().isEmail().normalizeEmail().withMessage('Please provide a valid email'),
   body('role').optional().isIn(['admin', 'reseller', 'user']).withMessage('Invalid role'),
-  body('isActive').optional().isBoolean().withMessage('isActive must be boolean')
+  body('isActive').optional().isBoolean().withMessage('isActive must be boolean'),
+  body('emailNotifications').optional().isBoolean().withMessage('emailNotifications must be boolean'),
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -202,25 +213,40 @@ router.put('/:id', authenticateToken, [
       return res.status(403).json({ message: 'Access denied' });
     }
 
-    // Resellers can change isActive on their clients but NOT role
-    if (!isAdmin && !isSelf) {
-      delete req.body.role;
+    // Build a strict allowlist — never spread req.body directly into $set.
+    // This prevents mass assignment of sensitive fields like resetPasswordToken,
+    // clients, managedUsers, etc.
+    const updates = {};
+
+    // Fields any authenticated user can edit on their own profile
+    const profileFields = ['firstName', 'lastName', 'email', 'emailNotifications'];
+    for (const field of profileFields) {
+      if (req.body[field] !== undefined) updates[field] = req.body[field];
     }
-    // Regular users cannot change their own role or isActive
-    if (!isAdmin && isSelf) {
-      delete req.body.role;
-      delete req.body.isActive;
+
+    if (isAdmin) {
+      // Admin can additionally change role, isActive, source, and relationship arrays
+      if (req.body.role     !== undefined) updates.role     = req.body.role;
+      if (req.body.isActive !== undefined) updates.isActive = req.body.isActive;
+      if (req.body.source   !== undefined) updates.source   = req.body.source;
+    } else if (!isSelf && isResellerClient) {
+      // Resellers can toggle isActive on their own clients only
+      if (req.body.isActive !== undefined) updates.isActive = req.body.isActive;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ message: 'No valid fields to update' });
     }
 
     // Check email uniqueness if changing email
-    if (req.body.email) {
-      const existing = await User.findOne({ email: req.body.email, _id: { $ne: req.params.id } });
+    if (updates.email) {
+      const existing = await User.findOne({ email: updates.email, _id: { $ne: req.params.id } });
       if (existing) return res.status(400).json({ message: 'Email already in use' });
     }
 
     const user = await User.findByIdAndUpdate(
       req.params.id,
-      { $set: req.body },
+      { $set: updates },
       { new: true, runValidators: true }
     ).select('-password');
 
@@ -243,7 +269,6 @@ router.delete('/:id', authenticateToken, authorize('admin'), async (req, res) =>
     const user = await User.findByIdAndDelete(req.params.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    // Clean up associated balance and rate
     await Balance.deleteOne({ user: req.params.id });
     await Rate.deleteMany({ user: req.params.id });
 

@@ -2,12 +2,15 @@ import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
+type Role = 'admin' | 'reseller' | 'user';
+
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  requiredRole?: 'admin' | 'reseller' | 'user';
+  /** If provided, user must have one of these roles or they are redirected to /dashboard */
+  roles?: Role[];
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredRole }) => {
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, roles }) => {
   const { isAuthenticated, user, isLoading } = useAuth();
 
   if (isLoading) {
@@ -22,7 +25,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredRole 
     return <Navigate to="/login" replace />;
   }
 
-  if (requiredRole && user?.role !== requiredRole) {
+  if (roles && user && !roles.includes(user.role as Role)) {
     return <Navigate to="/dashboard" replace />;
   }
 

@@ -20,6 +20,36 @@ const resultStorage = multer.diskStorage({
     cb(null, `result-${unique}${ext}`);
   },
 });
+
+/**
+ * Validate the actual content of an uploaded file by reading its magic bytes.
+ * Extension spoofing (e.g. malware.exe renamed to malware.pdf) is rejected here.
+ */
+function validateMagicBytes(filePath, extension) {
+  try {
+    const buf = Buffer.alloc(8);
+    const fd  = fs.openSync(filePath, 'r');
+    fs.readSync(fd, buf, 0, 8, 0);
+    fs.closeSync(fd);
+
+    if (extension === '.pdf') {
+      // PDF magic: %PDF
+      return buf.slice(0, 4).toString('ascii') === '%PDF';
+    }
+    if (extension === '.zip') {
+      // ZIP magic: PK (0x50 0x4B)
+      return buf[0] === 0x50 && buf[1] === 0x4B;
+    }
+    if (extension === '.csv') {
+      // CSV has no magic bytes — reject files with null bytes (binary content)
+      return !buf.includes(0x00);
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 const uploadResult = multer({
   storage: resultStorage,
   fileFilter: (req, file, cb) => {
@@ -27,10 +57,11 @@ const uploadResult = multer({
     if (['.zip', '.pdf', '.csv'].includes(ext)) cb(null, true);
     else cb(new Error('Only ZIP, PDF, or CSV files are allowed'));
   },
-  limits: { fileSize: 100 * 1024 * 1024 }, // 100 MB
+  limits: { fileSize: 25 * 1024 * 1024 }, // 25 MB — reduced from 100 MB
 });
 
 // ── POST /api/vendor-portal/auth/login ───────────────────────────────────
+// Note: authLimiter is applied to /api/vendor-portal/* in server/index.js
 router.post('/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -96,7 +127,6 @@ router.get('/me', async (req, res) => {
 });
 
 // ── GET /api/vendor-portal/jobs ───────────────────────────────────────────
-// Returns: open jobs for this vendor's carriers + jobs assigned to this vendor
 router.get('/jobs', async (req, res) => {
   try {
     const { status, page = 1, limit = 20 } = req.query;
@@ -116,12 +146,14 @@ router.get('/jobs', async (req, res) => {
       };
     }
 
-    const skip  = (parseInt(page) - 1) * parseInt(limit);
+    const safePage  = Math.max(1, parseInt(page) || 1);
+    const safeLimit = Math.min(parseInt(limit) || 20, 100);
+    const skip  = (safePage - 1) * safeLimit;
     const total = await ManifestJob.countDocuments(filter);
     const jobs  = await ManifestJob.find(filter)
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(parseInt(limit))
+      .limit(safeLimit)
       .select('carrier status requestFile.originalName requestFile.labelCount vendorEarning assignedAt acceptedAt vendorUploadedAt createdAt resultFile.coolingDeadline resultFile.uploadedAt assignedVendor');
 
     const myId = req.vendor._id.toString();
@@ -139,7 +171,7 @@ router.get('/jobs', async (req, res) => {
       return obj;
     });
 
-    res.json({ jobs: enriched, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)) });
+    res.json({ jobs: enriched, total, page: safePage, pages: Math.ceil(total / safeLimit) });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
   }
@@ -151,14 +183,12 @@ router.get('/jobs/:id', async (req, res) => {
     const job = await ManifestJob.findById(req.params.id);
     if (!job) return res.status(404).json({ message: 'Job not found' });
 
-    // Must be either an open job for this vendor's carrier, or assigned to this vendor
     const vendorCarriers = req.vendor.carriers || [];
     const isOpen     = job.status === 'open' && vendorCarriers.includes(job.carrier);
     const isAssigned = job.assignedVendor?.toString() === req.vendor._id.toString();
     if (!isOpen && !isAssigned) return res.status(404).json({ message: 'Job not found' });
 
     const obj = job.toObject();
-    // Expose sheet name + label count only — no customer data
     obj.sheetName  = obj.requestFile?.originalName || 'manifest.csv';
     obj.labelCount = obj.requestFile?.labelCount   || 0;
     delete obj.user;
@@ -201,7 +231,6 @@ router.put('/jobs/:id/accept', async (req, res) => {
     const vendorCarriers = req.vendor.carriers || [];
 
     if (job.status === 'open') {
-      // Anyone matching the carrier can claim an open job
       if (!vendorCarriers.includes(job.carrier)) {
         return res.status(403).json({ message: `You do not support carrier ${job.carrier}` });
       }
@@ -215,7 +244,6 @@ router.put('/jobs/:id/accept', async (req, res) => {
       return res.json({ message: 'Job claimed. Download the CSV and upload your result when ready.', job: { _id: job._id, status: job.status } });
     }
 
-    // Already-assigned flow: vendor confirms acceptance
     if (job.assignedVendor?.toString() !== req.vendor._id.toString()) {
       return res.status(404).json({ message: 'Job not found' });
     }
@@ -240,14 +268,29 @@ router.post('/jobs/:id/upload', uploadResult.single('file'), async (req, res) =>
   try {
     if (!req.file) return res.status(400).json({ message: 'Result file is required' });
 
-    const job = await ManifestJob.findOne({ _id: req.params.id, assignedVendor: req.vendor._id });
+    // Validate file content via magic bytes (prevents extension spoofing)
+    const ext = path.extname(req.file.originalname).toLowerCase();
+    if (!validateMagicBytes(req.file.path, ext)) {
+      fs.unlinkSync(req.file.path);
+      return res.status(400).json({ message: 'File content does not match its declared type' });
+    }
+
+    // Atomic status transition: only one concurrent upload can succeed per job.
+    // findOneAndUpdate with a status filter acts as an optimistic lock —
+    // if two requests race, only the first to hit MongoDB will match and proceed.
+    const job = await ManifestJob.findOneAndUpdate(
+      {
+        _id:            req.params.id,
+        assignedVendor: req.vendor._id,
+        status:         { $in: ['assigned', 'accepted', 'rejected'] },
+      },
+      { $set: { status: 'uploading' } }, // intermediate lock state
+      { new: true }
+    );
+
     if (!job) {
       fs.unlinkSync(req.file.path);
-      return res.status(404).json({ message: 'Job not found' });
-    }
-    if (!['assigned', 'accepted', 'rejected'].includes(job.status)) {
-      fs.unlinkSync(req.file.path);
-      return res.status(400).json({ message: `Cannot upload for a job with status "${job.status}"` });
+      return res.status(409).json({ message: 'Job not found, not in an uploadable state, or upload already in progress' });
     }
 
     // Remove old result file if re-uploading after rejection
@@ -273,14 +316,15 @@ router.post('/jobs/:id/upload', uploadResult.single('file'), async (req, res) =>
     });
     await job.save();
 
-    // Credit vendor payable balance
-    const vendor = req.vendor;
+    // Credit vendor payable balance AFTER job is persisted.
+    // This runs after the atomic lock so only one request ever reaches this point per job.
+    const vendor  = req.vendor;
     const earning = (job.requestFile?.labelCount || 0) * vendor.vendorRate;
     if (earning > 0) {
       await ManifestVendor.findByIdAndUpdate(vendor._id, {
         $inc: {
-          payableBalance:       earning,
-          'stats.totalLabels':  job.requestFile?.labelCount || 0,
+          payableBalance:      earning,
+          'stats.totalLabels': job.requestFile?.labelCount || 0,
         }
       });
     }
@@ -319,19 +363,18 @@ router.delete('/jobs/:id/upload', async (req, res) => {
     if (earning > 0) {
       await ManifestVendor.findByIdAndUpdate(vendor._id, {
         $inc: {
-          payableBalance:       -earning,
-          'stats.totalLabels':  -(job.requestFile?.labelCount || 0),
+          payableBalance:      -earning,
+          'stats.totalLabels': -(job.requestFile?.labelCount || 0),
         }
       });
     }
 
-    // Remove the file
     if (job.resultFile?.path && fs.existsSync(job.resultFile.path)) {
       fs.unlinkSync(job.resultFile.path);
     }
 
     job.resultFile = undefined;
-    job.status     = 'accepted'; // back to accepted
+    job.status     = 'accepted';
     job.timeline.push({
       status:  'accepted',
       note:    'Vendor cancelled upload during cooling period. Ready to re-upload.',

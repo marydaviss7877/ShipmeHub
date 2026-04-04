@@ -1,10 +1,11 @@
 const express = require('express');
-const crypto = require('crypto');
+const crypto  = require('crypto');
 const { body, validationResult } = require('express-validator');
-const User = require('../models/User');
-const Balance = require('../models/Balance');
-const Rate = require('../models/Rate');
+const User           = require('../models/User');
+const Balance        = require('../models/Balance');
+const Rate           = require('../models/Rate');
 const { generateToken, authenticateToken } = require('../middleware/auth');
+const { sendMail }   = require('../services/mailer');
 
 const router = express.Router();
 
@@ -13,8 +14,7 @@ router.post('/register', [
   body('firstName').trim().notEmpty().withMessage('First name is required'),
   body('lastName').trim().notEmpty().withMessage('Last name is required'),
   body('email').isEmail().normalizeEmail().withMessage('Please provide a valid email'),
-  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
-  body('role').optional().isIn(['admin', 'reseller', 'user']).withMessage('Invalid role')
+  body('password').isLength({ min: 12 }).withMessage('Password must be at least 12 characters'),
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -22,18 +22,17 @@ router.post('/register', [
       return res.status(400).json({ message: 'Validation failed', errors: errors.array() });
     }
 
-    const { firstName, lastName, email, password, role = 'user' } = req.body;
+    const { firstName, lastName, email, password } = req.body;
 
-    // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ message: 'User already exists with this email' });
     }
 
-    // Create user (password hashed via mongoose pre-save hook)
-    const user = await User.create({ firstName, lastName, email, password, role });
+    // Public registration always creates role:'user'.
+    // Admins/resellers are created only via POST /api/users (requires admin token).
+    const user = await User.create({ firstName, lastName, email, password, role: 'user' });
 
-    // Auto-create balance and rate for new user
     await Balance.create({ user: user._id, currentBalance: 0, transactions: [] });
     await Rate.create({ user: user._id, labelRate: 1.00, setBy: user._id, notes: 'Default rate' });
 
@@ -70,7 +69,6 @@ router.post('/login', [
 
     const { email, password } = req.body;
 
-    // Find user and include password field (select: false by default)
     const user = await User.findOne({ email }).select('+password');
     if (!user) {
       return res.status(401).json({ message: 'Invalid credentials' });
@@ -80,13 +78,11 @@ router.post('/login', [
       return res.status(401).json({ message: 'Account is deactivated. Please contact admin.' });
     }
 
-    // Secure bcrypt comparison
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    // Update last login
     user.lastLogin = new Date();
     await user.save();
 
@@ -142,6 +138,9 @@ router.get('/me', authenticateToken, async (req, res) => {
 router.post('/forgot-password', [
   body('email').isEmail().normalizeEmail().withMessage('Please provide a valid email')
 ], async (req, res) => {
+  // Always return the same message to prevent account enumeration
+  const SAFE_RESPONSE = { message: 'If an account with that email exists, a password reset link has been sent.' };
+
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -151,21 +150,40 @@ router.post('/forgot-password', [
     const { email } = req.body;
     const user = await User.findOne({ email });
 
-    // Always return same message to avoid enumeration attacks
     if (!user) {
-      return res.json({ message: 'If an account with that email exists, a password reset link has been sent.' });
+      return res.json(SAFE_RESPONSE);
     }
 
-    // Generate reset token
+    // Generate reset token — store only the hashed version
     const resetToken = crypto.randomBytes(32).toString('hex');
-    user.resetPasswordToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+    user.resetPasswordToken  = crypto.createHash('sha256').update(resetToken).digest('hex');
     user.resetPasswordExpire = Date.now() + 10 * 60 * 1000; // 10 minutes
     await user.save();
 
-    console.log(`📧 Password reset token for ${email}: ${resetToken}`);
-    // TODO: Send real email with reset link using EMAIL_* env vars
+    // Send reset email — never log the raw token
+    const resetUrl = `${process.env.CLIENT_URL}/reset-password?token=${resetToken}`;
+    try {
+      await sendMail({
+        to:      user.email,
+        subject: 'Password Reset Request — ShipmeHub',
+        html: `
+          <p>You requested a password reset for your ShipmeHub account.</p>
+          <p><a href="${resetUrl}">Click here to reset your password</a></p>
+          <p>This link expires in <strong>10 minutes</strong>.</p>
+          <p>If you did not request this, ignore this email — your password will not change.</p>
+        `,
+      });
+    } catch (mailErr) {
+      // Email failure should not expose which accounts exist
+      console.error('Password reset email failed to send:', mailErr.message);
+      // Clear the token so the user can try again
+      user.resetPasswordToken  = undefined;
+      user.resetPasswordExpire = undefined;
+      await user.save();
+      return res.status(500).json({ message: 'Failed to send reset email. Please try again later.' });
+    }
 
-    res.json({ message: 'If an account with that email exists, a password reset link has been sent.' });
+    res.json(SAFE_RESPONSE);
   } catch (error) {
     console.error('Forgot password error:', error);
     res.status(500).json({ message: 'Server error during password reset' });
@@ -175,7 +193,7 @@ router.post('/forgot-password', [
 // ── POST /api/auth/reset-password ────────────────────────────
 router.post('/reset-password', [
   body('token').notEmpty().withMessage('Reset token is required'),
-  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters')
+  body('password').isLength({ min: 12 }).withMessage('Password must be at least 12 characters')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -187,7 +205,7 @@ router.post('/reset-password', [
 
     const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
     const user = await User.findOne({
-      resetPasswordToken: hashedToken,
+      resetPasswordToken:  hashedToken,
       resetPasswordExpire: { $gt: Date.now() }
     });
 
@@ -195,8 +213,8 @@ router.post('/reset-password', [
       return res.status(400).json({ message: 'Invalid or expired reset token' });
     }
 
-    user.password = password;
-    user.resetPasswordToken = undefined;
+    user.password            = password;
+    user.resetPasswordToken  = undefined;
     user.resetPasswordExpire = undefined;
     await user.save();
 
@@ -209,7 +227,8 @@ router.post('/reset-password', [
 
 // ── POST /api/auth/logout ─────────────────────────────────────
 router.post('/logout', authenticateToken, (req, res) => {
-  // JWT is stateless — client removes token. Server just confirms.
+  // JWT is stateless — client removes token from storage.
+  // For full revocation, implement a Redis-backed token blocklist.
   res.json({ message: 'Logout successful' });
 });
 

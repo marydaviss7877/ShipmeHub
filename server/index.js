@@ -1,14 +1,15 @@
 const startTime = Date.now();
 console.log('⏳ Starting ShipmeHub server…');
 
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
+const express    = require('express');
+const cors       = require('cors');
+const helmet     = require('helmet');
+const rateLimit  = require('express-rate-limit');
+const jwt        = require('jsonwebtoken');
 const { createServer } = require('http');
-const { Server } = require('socket.io');
-const mongoose = require('mongoose');
-const path = require('path');
+const { Server }       = require('socket.io');
+const mongoose   = require('mongoose');
+const path       = require('path');
 require('dotenv').config();
 
 const authRoutes    = require('./routes/auth');
@@ -34,10 +35,20 @@ const expenseCategoryRoutes    = require('./routes/expenseCategories');
 const cashbookRoutes           = require('./routes/cashbook');
 const equityPartnerRoutes      = require('./routes/equityPartners');
 const financialDashboardRoutes = require('./routes/financialDashboard');
-const attendanceRoutes              = require('./routes/attendance');
 const shippershubAccountRoutes      = require('./routes/shippershubAccounts');
 
-const app = express();
+// ── Startup validation ────────────────────────────────────────
+// Fail fast rather than running in a broken / insecure state.
+if (!process.env.JWT_SECRET) {
+  console.error('❌ FATAL: JWT_SECRET environment variable is not set. Refusing to start.');
+  process.exit(1);
+}
+if (process.env.NODE_ENV === 'production' && !process.env.CLIENT_URL) {
+  console.error('❌ FATAL: CLIENT_URL must be set in production. Refusing to start.');
+  process.exit(1);
+}
+
+const app    = express();
 const server = createServer(app);
 
 const allowedOrigins = process.env.CLIENT_URL
@@ -51,40 +62,49 @@ const io = new Server(server, {
   }
 });
 
-// Security middleware
+// ── Security middleware ───────────────────────────────────────
 app.use(helmet());
 app.use(cors({
   origin: allowedOrigins,
   credentials: true
 }));
 
-// Rate limiting — generous limit for development, tighten for production
+// ── Rate limiting ─────────────────────────────────────────────
+// Global limiter for all routes
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: process.env.NODE_ENV === 'production' ? 100 : 1000,
-  message: { message: 'Too many requests, please try again later.' }
+  message: { message: 'Too many requests, please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 app.use(limiter);
 
-// Stricter limiter just for auth endpoints in production
+// Stricter limiter for authentication endpoints (login, register, password reset)
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: process.env.NODE_ENV === 'production' ? 20 : 500,
-  message: { message: 'Too many login attempts, please try again later.' }
+  message: { message: 'Too many login attempts, please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 
-// Body parsing middleware
+// ── Body parsing ──────────────────────────────────────────────
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Make io accessible to routes
+// ── Attach socket.io to request ───────────────────────────────
 app.use((req, res, next) => {
   req.io = io;
   next();
 });
 
-// Routes
-app.use('/api/auth',     authRoutes);
+// ── Routes ────────────────────────────────────────────────────
+// Auth routes get the stricter per-endpoint rate limiter
+app.use('/api/auth',         authLimiter, authRoutes);
+// Vendor portal login also gets the auth limiter
+app.use('/api/vendor-portal', authLimiter, vendorPortalRoutes);
+
 app.use('/api/users',    userRoutes);
 app.use('/api/email',    emailRoutes);
 app.use('/api/balance',  balanceRoutes);
@@ -95,7 +115,6 @@ app.use('/api/vendors',        vendorRoutes);
 app.use('/api/access',         accessRoutes);
 app.use('/api/manifest',       manifestRoutes);
 app.use('/api/admin/manifest', adminManifestRoutes);
-app.use('/api/vendor-portal',    vendorPortalRoutes);
 app.use('/api/manifest-vendors', manifestVendorRoutes);
 app.use('/api/announcements',   announcementRoutes);
 app.use('/api/payment-logs',    paymentLogRoutes);
@@ -107,72 +126,73 @@ app.use('/api/expense-categories',    expenseCategoryRoutes);
 app.use('/api/cashbook',              cashbookRoutes);
 app.use('/api/equity-partners',       equityPartnerRoutes);
 app.use('/api/financial-dashboard',   financialDashboardRoutes);
-app.use('/api/attendance',            attendanceRoutes);
 app.use('/api/shippershub-accounts',  shippershubAccountRoutes);
 
-// Health check endpoint
+// ── Health check ──────────────────────────────────────────────
+// Returns minimal info only — no internal state exposed publicly
 app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'OK',
-    timestamp: new Date().toISOString(),
-    db: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
-  });
+  res.json({ status: 'ok' });
 });
 
-// Serve React build in production; API info + 404 in development
+// ── Static files / 404 ───────────────────────────────────────
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../client/build')));
   app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
   });
 } else {
-  app.get('/', (req, res) => {
-    res.json({
-      message: 'USPS Label Portal API',
-      version: '1.0.0',
-      endpoints: {
-        health: '/api/health',
-        auth: '/api/auth',
-        users: '/api/users',
-        files: '/api/files',
-        email: '/api/email',
-        balance: '/api/balance',
-        rates: '/api/rates',
-        carriers: '/api/carriers',
-        vendors: '/api/vendors',
-        labels: '/api/labels',
-        access: '/api/access'
-      }
-    });
-  });
   app.use('*', (req, res) => {
     res.status(404).json({ message: 'Route not found' });
   });
 }
 
-// Global error handler
+// ── Global error handler ──────────────────────────────────────
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({
     message: 'Something went wrong!',
-    error: process.env.NODE_ENV === 'development' ? err.message : {}
+    // Never expose stack traces or internal errors in production
+    error: process.env.NODE_ENV === 'development' ? err.message : undefined
   });
 });
 
-// Socket.io connection handling
+// ── Socket.io — authenticated connections only ────────────────
+//
+// Each connecting client must supply its JWT in the handshake auth object:
+//   io({ auth: { token: localStorage.getItem('token') } })
+//
+// The middleware verifies the token and attaches userId to the socket.
+// The socket is then automatically joined to the user's own room — the
+// client no longer needs to emit 'join-room', and cannot join anyone else's.
+
+io.use(async (socket, next) => {
+  const token = socket.handshake.auth?.token;
+  if (!token) return next(new Error('Authentication required'));
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    // Lazy-load User model to avoid circular dependency issues at startup
+    const User = require('./models/User');
+    const user = await User.findById(decoded.id).select('_id isActive');
+    if (!user || !user.isActive) return next(new Error('User not found or inactive'));
+    socket.userId = user._id.toString();
+    next();
+  } catch {
+    next(new Error('Invalid or expired token'));
+  }
+});
+
 io.on('connection', (socket) => {
-  console.log('User connected:', socket.id);
-  socket.on('join-room', (userId) => {
-    socket.join(userId);
-    console.log(`User ${userId} joined their room`);
-  });
+  // Auto-join the user's own private room — no client-controlled room joining
+  socket.join(socket.userId);
+
   socket.on('disconnect', () => {
-    console.log('User disconnected:', socket.id);
+    // No-op — socket.io cleans up room membership automatically
   });
 });
 
-// ── MongoDB Connection + Server Start ─────────────────────────
-const PORT = process.env.PORT || 5001;
+// ── MongoDB + Server start ────────────────────────────────────
+const PORT = parseInt(process.env.PORT || '5001', 10);
 
 const connectDB = async () => {
   try {
@@ -193,11 +213,11 @@ async function seedShippersHubAccount() {
   try {
     const ShippersHubAccount = require('./models/ShippersHubAccount');
     const count = await ShippersHubAccount.countDocuments();
-    if (count > 0) return; // already have accounts, skip
+    if (count > 0) return;
 
     const email    = process.env.SHIPPERSHUB_EMAIL;
     const password = process.env.SHIPPERSHUB_PASSWORD;
-    if (!email || !password) return; // no env creds to migrate
+    if (!email || !password) return;
 
     const account = new ShippersHubAccount({ name: 'Default Account', email, encryptedPassword: '', iv: '', isActive: true });
     account.setPassword(password);
@@ -217,27 +237,9 @@ connectDB().then(async () => {
   });
 
   server.on('error', (err) => {
-    if (err.code === 'EADDRINUSE') {
-      console.error(`❌ Port ${PORT} is already in use. Killing the old process and retrying…`);
-      const { execSync } = require('child_process');
-      try {
-        if (process.platform === 'win32') {
-          const result = execSync(`netstat -ano | findstr :${PORT}`, { encoding: 'utf8' });
-          const lines = result.trim().split('\n');
-          const pids = [...new Set(lines.map(l => l.trim().split(/\s+/).pop()).filter(p => p && p !== '0'))];
-          pids.forEach(pid => { try { execSync(`taskkill /F /PID ${pid}`); } catch (_) {} });
-        } else {
-          execSync(`fuser -k ${PORT}/tcp`);
-        }
-      } catch (_) {}
-      setTimeout(() => {
-        server.close();
-        server.listen(PORT, () => {
-          console.log(`🚀 Server running on port ${PORT} (restarted)`);
-        });
-      }, 1000);
-    } else {
-      throw err;
-    }
+    // Let the process manager (PM2, Railway, Docker) handle port conflicts and restarts.
+    // Do not use execSync/shell commands to kill processes — that's a security risk.
+    console.error(`❌ Server error: ${err.message}`);
+    process.exit(1);
   });
 });

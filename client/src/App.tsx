@@ -31,10 +31,18 @@ import SalesAgents         from './pages/SalesAgents';
 import Finance             from './pages/Finance';
 import CashBook            from './pages/CashBook';
 import FinancialDashboard  from './pages/FinancialDashboard';
-import AttendanceCheckIn  from './pages/AttendanceCheckIn';
-import AttendanceAdmin    from './pages/AttendanceAdmin';
-import Settings           from './pages/Settings';
+import Settings            from './pages/Settings';
+import AttendanceAdmin     from './pages/AttendanceAdmin';
+import AttendanceCheckIn   from './pages/AttendanceCheckIn';
 import './App.css';
+
+// Shorthand wrappers to keep JSX clean
+const AdminOnly = ({ children }: { children: React.ReactNode }) => (
+  <ProtectedRoute roles={['admin']}>{children}</ProtectedRoute>
+);
+const AdminOrReseller = ({ children }: { children: React.ReactNode }) => (
+  <ProtectedRoute roles={['admin', 'reseller']}>{children}</ProtectedRoute>
+);
 
 function App() {
   return (
@@ -64,48 +72,40 @@ function App() {
                   </ProtectedRoute>
                 }>
                   <Route index element={<Navigate to="/dashboard" replace />} />
-                  <Route path="dashboard" element={<Dashboard />} />
-                  <Route path="profile"   element={<Profile />} />
 
-                  {/* Announcements */}
-                  <Route path="announcements" element={<Announcements />} />
-
-                  {/* Non-manifested (API) labels */}
-                  <Route path="labels/single" element={<LabelGenerator />} />
-                  <Route path="labels/bulk"   element={<BulkLabelGenerator />} />
-                  <Route path="labels/history" element={<LabelHistory />} />
+                  {/* All authenticated users */}
+                  <Route path="dashboard"           element={<Dashboard />} />
+                  <Route path="profile"             element={<Profile />} />
+                  <Route path="announcements"       element={<Announcements />} />
+                  <Route path="labels/single"       element={<LabelGenerator />} />
+                  <Route path="labels/bulk"         element={<BulkLabelGenerator />} />
+                  <Route path="labels/history"      element={<LabelHistory />} />
                   <Route path="labels/bulk-history" element={<BulkLabels />} />
+                  <Route path="manifest/upload"     element={<Navigate to="/labels/bulk" replace />} />
+                  <Route path="manifest/history"    element={<ManifestHistory />} />
+                  <Route path="activity"            element={<LiveActivity />} />
+                  <Route path="attendance/checkin"  element={<AttendanceCheckIn />} />
 
-                  {/* Manifested labels */}
-                  <Route path="manifest/upload"   element={<Navigate to="/labels/bulk" replace />} />
-                  <Route path="manifest/history"  element={<ManifestHistory />} />
+                  {/* Admin-only routes */}
+                  <Route path="admin"                         element={<AdminOnly><AdminDashboard /></AdminOnly>} />
+                  <Route path="admin/users"                   element={<AdminOnly><UserManagement /></AdminOnly>} />
+                  <Route path="admin/users/:userId/access"    element={<AdminOnly><UserVendorAccess /></AdminOnly>} />
+                  <Route path="admin/vendors"                 element={<AdminOnly><VendorManagement /></AdminOnly>} />
+                  <Route path="admin/manifest"                element={<AdminOnly><AdminManifestOps /></AdminOnly>} />
+                  <Route path="admin/sales-agents"            element={<AdminOnly><SalesAgents /></AdminOnly>} />
+                  <Route path="admin/finance"                 element={<AdminOnly><Finance /></AdminOnly>} />
+                  <Route path="admin/cashbook"               element={<AdminOnly><CashBook /></AdminOnly>} />
+                  <Route path="admin/financial-dashboard"    element={<AdminOnly><FinancialDashboard /></AdminOnly>} />
+                  <Route path="admin/settings"              element={<AdminOnly><Settings /></AdminOnly>} />
+                  <Route path="admin/attendance"            element={<AdminOnly><AttendanceAdmin /></AdminOnly>} />
 
-                  {/* Admin routes */}
-                  <Route path="admin"                         element={<AdminDashboard />} />
-                  <Route path="admin/users"                   element={<UserManagement />} />
-                  <Route path="admin/users/:userId/access"    element={<UserVendorAccess />} />
-                  <Route path="admin/vendors"                 element={<VendorManagement />} />
-                  <Route path="admin/manifest"                element={<AdminManifestOps />} />
-                  <Route path="admin/sales-agents"            element={<SalesAgents />} />
-                  <Route path="admin/finance"                 element={<Finance />} />
-                  <Route path="admin/cashbook"               element={<CashBook />} />
-                  <Route path="admin/financial-dashboard"    element={<FinancialDashboard />} />
-                  <Route path="admin/attendance"             element={<AttendanceAdmin />} />
-                  <Route path="admin/settings"              element={<Settings />} />
-
-                  {/* Sales agent self check-in */}
-                  <Route path="attendance" element={<AttendanceCheckIn />} />
-
-                  {/* Reseller portal */}
-                  <Route path="reseller/clients"  element={<ResellerClients />} />
-                  <Route path="reseller/finance"  element={<Finance />} />
-
-                  {/* Platform activity */}
-                  <Route path="activity" element={<LiveActivity />} />
+                  {/* Reseller routes (admin can also access) */}
+                  <Route path="reseller/clients"  element={<AdminOrReseller><ResellerClients /></AdminOrReseller>} />
+                  <Route path="reseller/finance"  element={<AdminOrReseller><Finance /></AdminOrReseller>} />
                 </Route>
 
-                {/* Catch all */}
-                <Route path="*" element={<Navigate to="/login" replace />} />
+                {/* Catch all → landing page */}
+                <Route path="*" element={<Navigate to="/landing.html" replace />} />
               </Routes>
             </div>
           </Router>

@@ -1,22 +1,23 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
 const Balance = require('../models/Balance');
-const User = require('../models/User');
+const User    = require('../models/User');
 const { authenticateToken, authorize } = require('../middleware/auth');
 
 const router = express.Router();
+
+/** Maximum items per page for paginated endpoints */
+const PAGE_LIMIT_MAX = 100;
 
 // ── Helper: format currency string ───────────────────────────
 const fmt = (n) => `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
 
 // ── GET /api/balance ──────────────────────────────────────────
-// Own balance with aggregated totals derived from transaction history
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const balance = await Balance.getOrCreateBalance(req.user._id);
     const txns = balance.transactions || [];
 
-    // Compute totals from real transaction history
     const totalDeposited = txns
       .filter(t => t.type === 'topup')
       .reduce((sum, t) => sum + t.amount, 0);
@@ -37,9 +38,9 @@ router.get('/', authenticateToken, async (req, res) => {
     res.json({
       balance: {
         currentBalance:    balance.currentBalance,
-        totalDeposited:    totalDeposited,
-        totalSpent:        totalSpent,
-        totalDistributed:  totalDistributed,
+        totalDeposited,
+        totalSpent,
+        totalDistributed,
         recentTransactions
       }
     });
@@ -49,14 +50,11 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
-
 // ── GET /api/balance/:userId ──────────────────────────────────
-// Balance for a specific user — admin or reseller managing their client
 router.get('/:userId', authenticateToken, async (req, res) => {
   try {
     const { userId } = req.params;
 
-    // Permission check
     if (req.user.role !== 'admin' && req.user._id.toString() !== userId) {
       const target = await User.findById(userId);
       if (!target) return res.status(404).json({ message: 'User not found' });
@@ -78,23 +76,24 @@ router.get('/:userId', authenticateToken, async (req, res) => {
 });
 
 // ── GET /api/balance/transactions ─────────────────────────────
-// Paginated transaction history — own account
 router.get('/transactions', authenticateToken, async (req, res) => {
   try {
-    const { page = 1, limit = 10 } = req.query;
+    const page  = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(parseInt(req.query.limit) || 10, PAGE_LIMIT_MAX);
+
     const balance = await Balance.getOrCreateBalance(req.user._id);
 
     const sorted = [...balance.transactions].sort(
       (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
     );
-    const start = (page - 1) * limit;
-    const paginated = sorted.slice(start, start + parseInt(limit));
+    const start     = (page - 1) * limit;
+    const paginated = sorted.slice(start, start + limit);
 
     res.json({
       transactions: paginated,
-      totalPages: Math.ceil(sorted.length / limit),
-      currentPage: parseInt(page),
-      total: sorted.length
+      totalPages:  Math.ceil(sorted.length / limit),
+      currentPage: page,
+      total:       sorted.length
     });
   } catch (error) {
     console.error('Get transactions error:', error);
@@ -134,8 +133,8 @@ router.post('/topup', authenticateToken, authorize('admin', 'reseller'), [
 
     const balance = await Balance.getOrCreateBalance(userId);
     await balance.addTransaction({
-      type: 'topup',
-      amount: parseFloat(amount),
+      type:        'topup',
+      amount:      parseFloat(amount),
       description: description || `Top-up of ${fmt(amount)} by ${req.user.firstName}`,
       performedBy: req.user._id
     });
@@ -177,8 +176,8 @@ router.post('/deduct', authenticateToken, authorize('admin', 'reseller'), [
     }
 
     await balance.addTransaction({
-      type: 'deduction',
-      amount: parseFloat(amount),
+      type:        'deduction',
+      amount:      parseFloat(amount),
       description: description || `Deduction of ${fmt(amount)} by ${req.user.firstName}`,
       performedBy: req.user._id
     });
@@ -216,8 +215,8 @@ router.post('/adjust', authenticateToken, authorize('admin', 'reseller'), [
     const balance = await Balance.getOrCreateBalance(userId);
 
     await balance.addTransaction({
-      type: 'adjustment',
-      amount: parseFloat(amount),
+      type:        'adjustment',
+      amount:      parseFloat(amount),
       description: description || `Balance adjustment of ${fmt(amount)} by ${req.user.firstName}`,
       performedBy: req.user._id
     });

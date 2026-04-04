@@ -2,11 +2,13 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
 /**
- * Verify JWT token and attach user to request
+ * Verify JWT token and attach user to request.
+ * Token must be in the Authorization header only (Bearer scheme).
+ * Query-string tokens are NOT accepted — they leak into server logs.
  */
 const authenticateToken = async (req, res, next) => {
   const authHeader = req.headers['authorization'];
-  const token = (authHeader && authHeader.split(' ')[1]) || req.query.token;
+  const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
     return res.status(401).json({ message: 'Access token required' });

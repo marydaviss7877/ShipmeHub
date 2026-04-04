@@ -42,7 +42,6 @@ function apiRequest(method, path, data = null, token = null) {
       res.on('end', () => {
         try {
           const json = JSON.parse(raw);
-          console.log(`[ShippersHub] ${method} ${path} → status:${res.statusCode}`, JSON.stringify(json).slice(0, 400));
           if (res.statusCode >= 200 && res.statusCode < 300) {
             resolve(json);
           } else {
@@ -96,7 +95,6 @@ function apiRequestBinary(method, urlPath, data = null, token = null) {
 }
 
 // ── Credential resolution ─────────────────────────────────────
-// Lazily require the model to avoid circular-dependency issues at startup.
 async function getCredentials() {
   try {
     const ShippersHubAccount = require('../models/ShippersHubAccount');
@@ -108,7 +106,6 @@ async function getCredentials() {
     // DB not ready yet or model not found — fall through to env vars
   }
 
-  // Fallback to .env
   const email    = process.env.SHIPPERSHUB_EMAIL;
   const password = process.env.SHIPPERSHUB_PASSWORD;
   if (!email || !password) {
@@ -160,12 +157,11 @@ async function getMyVendors(carrierId) {
 // We save it to disk, then fetch the most recent label record to get the tracking ID.
 async function createSingleLabel(labelData) {
   const token = await getToken();
-  console.log('[ShippersHub] createSingleLabel payload:', JSON.stringify(labelData, null, 2));
+  // Do not log the full labelData — it contains PII (sender/recipient names and addresses)
 
   const { buffer, contentType, statusCode } = await apiRequestBinary('POST', '/single_label/generate', labelData, token);
 
   if (statusCode < 200 || statusCode >= 300) {
-    // Try to parse error as JSON
     try {
       const errJson = JSON.parse(buffer.toString());
       const msg = errJson.message || errJson.error || errJson.msg || `ShippersHub error ${statusCode}`;
@@ -178,13 +174,10 @@ async function createSingleLabel(labelData) {
   const isPdf = contentType.includes('pdf') || buffer.slice(0, 4).toString('ascii') === '%PDF';
 
   if (isPdf) {
-    // Save PDF to disk
-    const filename    = `label-${Date.now()}-${Math.round(Math.random() * 1e6)}.pdf`;
-    const localPath   = path.join(LABELS_DIR, filename);
+    const filename  = `label-${Date.now()}-${Math.round(Math.random() * 1e6)}.pdf`;
+    const localPath = path.join(LABELS_DIR, filename);
     fs.writeFileSync(localPath, buffer);
-    console.log(`[ShippersHub] PDF saved → ${localPath}`);
 
-    // Fetch the most recent ShippersHub label record to get tracking ID
     let trackingID = '';
     let labelId    = null;
     let awsPath    = null;
@@ -205,20 +198,17 @@ async function createSingleLabel(labelData) {
     return {
       _id:        labelId,
       trackingID,
-      // Prefer S3 URL if available, fall back to our local copy
       awsPath:    awsPath  || `/api/labels/pdf/${filename}`,
       awsKey:     awsKey   || filename,
       localPdf:   localPath,
     };
   }
 
-  // Unexpected: response was not a PDF — try parsing as JSON
   try {
     const json = JSON.parse(buffer.toString());
-    console.log('[ShippersHub] createSingleLabel JSON response:', JSON.stringify(json).slice(0, 400));
     return json.data || json;
   } catch {
-    throw new Error(`Unexpected non-PDF response from ShippersHub label generation`);
+    throw new Error('Unexpected non-PDF response from ShippersHub label generation');
   }
 }
 

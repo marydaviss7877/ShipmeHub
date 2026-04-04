@@ -1,9 +1,13 @@
 const jwt           = require('jsonwebtoken');
 const ManifestVendor = require('../models/ManifestVendor');
 
+/**
+ * Verify vendor JWT token.
+ * Token must be in the Authorization header only — NOT in query string.
+ */
 const authenticateVendor = async (req, res, next) => {
   const authHeader = req.headers['authorization'];
-  const token = (authHeader && authHeader.split(' ')[1]) || req.query.token;
+  const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
     return res.status(401).json({ message: 'Vendor access token required' });

@@ -24,6 +24,7 @@ import {
   BellIcon,
   MegaphoneIcon,
   Cog6ToothIcon,
+  ClockIcon,
 } from '@heroicons/react/24/outline';
 
 // ── Announcement types ────────────────────────────────────────────────────────
@@ -177,9 +178,6 @@ const Layout: React.FC = () => {
     { name: 'Dashboard',      href: '/dashboard',      icon: HomeIcon,      current: location.pathname === '/dashboard' },
     { name: 'Announcements',  href: '/announcements',  icon: MegaphoneIcon, current: location.pathname === '/announcements' },
     { name: 'Live Activity',  href: '/activity',       icon: SignalIcon,    current: location.pathname === '/activity'  },
-    ...(user?.role !== 'admin'
-      ? [{ name: 'My Attendance', href: '/attendance', icon: ClipboardDocumentListIcon, current: location.pathname === '/attendance' }]
-      : []),
   ];
 
   const labelsNav: NavItem[] = [
@@ -199,8 +197,8 @@ const Layout: React.FC = () => {
     { name: 'Finance',             href: '/admin/finance',             icon: BanknotesIcon,             current: location.pathname === '/admin/finance' },
     { name: 'Cash Book',           href: '/admin/cashbook',            icon: BookOpenIcon,              current: location.pathname === '/admin/cashbook' },
     { name: 'Financial Dashboard', href: '/admin/financial-dashboard', icon: PresentationChartLineIcon, current: location.pathname === '/admin/financial-dashboard' },
-    { name: 'Attendance',          href: '/admin/attendance',          icon: ClipboardDocumentListIcon,  current: location.pathname === '/admin/attendance' },
     { name: 'Settings',            href: '/admin/settings',            icon: Cog6ToothIcon,               current: location.pathname === '/admin/settings' },
+    { name: 'Attendance',          href: '/admin/attendance',          icon: ClockIcon,                   current: location.pathname === '/admin/attendance' },
   ] : user?.role === 'reseller' ? [
     { name: 'My Clients', href: '/reseller/clients', icon: UserGroupIcon, current: location.pathname.startsWith('/reseller/clients') },
     { name: 'Finance',    href: '/reseller/finance', icon: BanknotesIcon, current: location.pathname === '/reseller/finance' },

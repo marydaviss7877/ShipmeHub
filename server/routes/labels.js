@@ -48,6 +48,19 @@ function rowsToCSV(rows) {
 
 const router = express.Router();
 
+/** Maximum results per page for list endpoints */
+const PAGE_LIMIT_MAX = 100;
+
+/** Escape special regex characters to prevent ReDoS */
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** Validate that a value is a 24-character hex string (MongoDB ObjectId) */
+function isValidObjectId(v) {
+  return /^[0-9a-fA-F]{24}$/.test(String(v));
+}
+
 // ── POST /api/labels/single ───────────────────────────────────
 // Generate a single label via ShippersHub, deduct balance
 router.post('/single', authenticateToken, [
@@ -422,16 +435,24 @@ router.post('/bulk', authenticateToken, [
 // Paginated label history for the authenticated user
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    const { page = 1, limit = 15, carrier, status, vendor, dateFrom, dateTo } = req.query;
+    const { carrier, status, dateFrom, dateTo } = req.query;
+    const page  = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(parseInt(req.query.limit) || 15, PAGE_LIMIT_MAX);
+
+    // Validate vendor ID before passing to MongoDB
+    const vendorParam = req.query.vendor;
+    if (vendorParam && !isValidObjectId(vendorParam)) {
+      return res.status(400).json({ message: 'Invalid vendor ID' });
+    }
 
     // This endpoint serves the single-label history only
     let filter = { isBulk: false };
     if (req.user.role !== 'admin') {
       filter.user = req.user._id;
     }
-    if (carrier)  filter.carrier = carrier;
-    if (status)   filter.status  = status;
-    if (vendor)   filter.vendor  = vendor;
+    if (carrier)     filter.carrier = carrier;
+    if (status)      filter.status  = status;
+    if (vendorParam) filter.vendor  = vendorParam;
     if (dateFrom || dateTo) {
       filter.createdAt = {};
       if (dateFrom) filter.createdAt.$gte = new Date(dateFrom);
@@ -444,13 +465,13 @@ router.get('/', authenticateToken, async (req, res) => {
       .populate('vendor', 'name carrier rate')
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
-      .limit(parseInt(limit));
+      .limit(limit);
 
     res.json({
       labels,
       total,
       totalPages:  Math.ceil(total / limit),
-      currentPage: parseInt(page)
+      currentPage: page
     });
   } catch (error) {
     console.error('Get labels error:', error);
@@ -462,15 +483,26 @@ router.get('/', authenticateToken, async (req, res) => {
 // Returns bulk jobs grouped by bulkJobId with aggregated totals
 router.get('/bulk-jobs', authenticateToken, async (req, res) => {
   try {
-    const { page = 1, limit = 15, dateFrom, dateTo, vendor, vendorId, carrier, search } = req.query;
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const { dateFrom, dateTo, carrier } = req.query;
+    const page  = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(parseInt(req.query.limit) || 15, PAGE_LIMIT_MAX);
+    const skip  = (page - 1) * limit;
     const mongoose = require('mongoose');
+
+    // Validate vendor IDs
+    const vid = req.query.vendorId || req.query.vendor;
+    if (vid && !isValidObjectId(vid)) {
+      return res.status(400).json({ message: 'Invalid vendor ID' });
+    }
+
+    // Escape search string to prevent ReDoS
+    const rawSearch = req.query.search;
+    const search = rawSearch && rawSearch.length <= 100 ? escapeRegex(rawSearch) : null;
 
     const matchStage = { isBulk: true };
     if (req.user.role !== 'admin') matchStage.user = new mongoose.Types.ObjectId(req.user._id);
-    const vid = vendorId || vendor;
-    if (vid) matchStage.vendor = new mongoose.Types.ObjectId(vid);
-    if (carrier) matchStage.carrier = carrier;
+    if (vid)     matchStage.vendor       = new mongoose.Types.ObjectId(vid);
+    if (carrier) matchStage.carrier      = carrier;
     if (search)  matchStage.bulkFileName = { $regex: search, $options: 'i' };
     if (dateFrom || dateTo) {
       matchStage.createdAt = {};
@@ -500,7 +532,7 @@ router.get('/bulk-jobs', authenticateToken, async (req, res) => {
         { $group: groupStage },
         { $sort: { createdAt: -1 } },
         { $skip: skip },
-        { $limit: parseInt(limit) },
+        { $limit: limit },
         { $lookup: { from: 'users', localField: 'userId', foreignField: '_id', as: 'user' } },
         { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
       ]),
@@ -516,8 +548,8 @@ router.get('/bulk-jobs', authenticateToken, async (req, res) => {
     res.json({
       jobs,
       total,
-      totalPages:  Math.ceil(total / parseInt(limit)),
-      currentPage: parseInt(page),
+      totalPages:  Math.ceil(total / limit),
+      currentPage: page,
     });
   } catch (error) {
     console.error('Get bulk jobs error:', error);

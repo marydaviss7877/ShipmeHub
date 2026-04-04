@@ -12,33 +12,34 @@ const SocketContext = createContext<SocketContextType | undefined>(undefined);
 export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, token } = useAuth();
 
   useEffect(() => {
-    if (isAuthenticated && user) {
-      // Strip the /api path — Socket.IO connects to the base server URL only,
-      // not the REST API prefix (which would be treated as a namespace).
-      const apiUrl   = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+    if (isAuthenticated && user && token) {
+      // Strip the /api path — Socket.IO connects to the base server URL only
+      const apiUrl    = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
       const serverUrl = apiUrl.replace(/\/api\/?$/, '');
+
       const newSocket = io(serverUrl, {
         transports: ['websocket'],
         autoConnect: true,
+        // Pass JWT in handshake auth — the server verifies it and auto-joins
+        // the socket to the user's own room. Never use query params for tokens.
+        auth: { token },
       });
 
       newSocket.on('connect', () => {
-        console.log('Connected to server');
         setIsConnected(true);
-        // Join user's room for personalized updates
-        newSocket.emit('join-room', user.id);
+        // Room joining is handled server-side after token verification.
+        // No 'join-room' event needed — and it would be rejected anyway.
       });
 
       newSocket.on('disconnect', () => {
-        console.log('Disconnected from server');
         setIsConnected(false);
       });
 
       newSocket.on('connect_error', (error) => {
-        console.error('Connection error:', error);
+        console.error('Socket connection error:', error.message);
         setIsConnected(false);
       });
 
@@ -56,14 +57,13 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         setIsConnected(false);
       }
     }
-  }, [isAuthenticated, user]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, user, token]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const value: SocketContextType = {
-    socket,
-    isConnected,
-  };
-
-  return <SocketContext.Provider value={value}>{children}</SocketContext.Provider>;
+  return (
+    <SocketContext.Provider value={{ socket, isConnected }}>
+      {children}
+    </SocketContext.Provider>
+  );
 };
 
 export const useSocket = (): SocketContextType => {
