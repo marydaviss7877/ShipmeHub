@@ -24,7 +24,7 @@ const Signup: React.FC = () => {
     const { firstName, lastName, email, password, confirmPassword } = formData;
     if (!firstName.trim() || !lastName.trim()) { setLocalError('First and last name are required.'); return; }
     if (password !== confirmPassword)           { setLocalError('Passwords do not match.'); return; }
-    if (password.length < 6)                   { setLocalError('Password must be at least 6 characters.'); return; }
+    if (password.length < 12)                  { setLocalError('Password must be at least 12 characters.'); return; }
     try { await register({ firstName, lastName, email, password }); } catch {}
   };
 
@@ -35,7 +35,7 @@ const Signup: React.FC = () => {
       <label htmlFor={id} className="form-label">{label}</label>
       <div style={{ position: 'relative' }}>
         <input
-          id={id} name={id} type={show ? 'text' : 'password'} required minLength={6}
+          id={id} name={id} type={show ? 'text' : 'password'} required minLength={12}
           className="form-input" style={{ paddingRight: '2.75rem' }}
           placeholder="••••••••"
           value={(formData as any)[id]}

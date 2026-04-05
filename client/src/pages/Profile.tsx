@@ -243,7 +243,7 @@ const Profile: React.FC = () => {
                   <label className="form-label">{label}</label>
                   <div style={{ position: 'relative' }}>
                     <input
-                      id={id} name={id} type={show ? 'text' : 'password'} required minLength={6}
+                      id={id} name={id} type={show ? 'text' : 'password'} required minLength={12}
                       className="form-input" style={{ paddingRight: '2.75rem' }}
                       value={(passwordData as any)[id]}
                       onChange={e => setPasswordData({ ...passwordData, [id]: e.target.value })}
