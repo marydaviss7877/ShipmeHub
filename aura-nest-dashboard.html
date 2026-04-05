@@ -1,0 +1,1126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Aura Nest · Business Dashboard</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --card2: #263348;
+      --accent: #10b981;
+      --accent2: #06b6d4;
+      --warn: #f59e0b;
+      --danger: #ef4444;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --border: #334155;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      font-size: 14px;
+    }
+
+    /* ── HEADER ── */
+    .header {
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 200;
+      gap: 12px;
+    }
+    .logo { display: flex; align-items: center; gap: 12px; }
+    .logo-icon {
+      width: 38px; height: 38px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 18px; color: #fff;
+      flex-shrink: 0;
+    }
+    .logo-text h1 { font-size: 16px; font-weight: 800; letter-spacing: -0.3px; }
+    .logo-text p { font-size: 11px; color: var(--muted); margin-top: 1px; }
+    .header-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+    .badge {
+      padding: 4px 10px; border-radius: 20px; font-size: 11px;
+      font-weight: 700; white-space: nowrap;
+    }
+    .badge-connected { background: rgba(16,185,129,.15); color: var(--accent); border: 1px solid rgba(16,185,129,.4); }
+    .badge-demo { background: rgba(245,158,11,.15); color: var(--warn); border: 1px solid rgba(245,158,11,.4); }
+    .btn {
+      padding: 7px 14px; border-radius: 8px; border: none; cursor: pointer;
+      font-size: 12px; font-weight: 600; transition: all .18s; white-space: nowrap;
+    }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: #059669; transform: translateY(-1px); }
+    .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+    .btn-ghost:hover { background: var(--card2); color: var(--text); }
+    .last-updated { font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+    /* ── SETTINGS PANEL ── */
+    .settings-panel {
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      max-height: 0; overflow: hidden;
+      transition: max-height .35s ease, padding .35s;
+      padding: 0 24px;
+    }
+    .settings-panel.open { max-height: 480px; padding: 20px 24px; }
+    .settings-panel h3 { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+    .settings-panel .hint {
+      font-size: 11px; color: var(--muted); margin-bottom: 16px; line-height: 1.6;
+      background: rgba(6,182,212,.08); border: 1px solid rgba(6,182,212,.2);
+      border-radius: 8px; padding: 10px 14px;
+    }
+    .settings-panel .hint strong { color: var(--accent2); }
+    .settings-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 14px; }
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    .form-group label { font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+    .form-group input {
+      background: var(--bg); border: 1px solid var(--border);
+      color: var(--text); padding: 8px 12px; border-radius: 7px;
+      font-size: 12px; outline: none; width: 100%;
+      transition: border-color .18s;
+    }
+    .form-group input:focus { border-color: var(--accent); }
+    .form-group input::placeholder { color: var(--border); }
+
+    /* ── MAIN LAYOUT ── */
+    .main { padding: 24px; max-width: 1440px; margin: 0 auto; }
+    .section-title {
+      display: flex; align-items: center; gap: 10px;
+      margin: 28px 0 16px;
+    }
+    .section-title h2 {
+      font-size: 11px; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 1.2px; white-space: nowrap;
+    }
+    .section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+    /* ── KPI CARDS ── */
+    .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+    .kpi-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      position: relative; overflow: hidden;
+      transition: transform .2s, box-shadow .2s;
+    }
+    .kpi-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.3); }
+    .kpi-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      background: var(--accent);
+    }
+    .kpi-card.cyan::before { background: var(--accent2); }
+    .kpi-card.warn::before { background: var(--warn); }
+    .kpi-card.danger::before { background: var(--danger); }
+    .kpi-emoji { position: absolute; top: 18px; right: 18px; font-size: 22px; opacity: .25; }
+    .kpi-label { font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 10px; }
+    .kpi-value { font-size: 28px; font-weight: 900; letter-spacing: -1px; line-height: 1; margin-bottom: 6px; }
+    .kpi-sub { font-size: 11px; color: var(--muted); line-height: 1.4; }
+    .kpi-pkr { font-size: 12px; color: var(--accent2); font-weight: 600; margin-top: 4px; }
+
+    /* ── GRID LAYOUTS ── */
+    .grid-2-1 { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+    .grid-1-1 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .grid-3   { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+
+    /* ── CHART CARDS ── */
+    .chart-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .chart-card h3 { font-size: 13px; font-weight: 700; margin-bottom: 3px; }
+    .chart-card p { font-size: 11px; color: var(--muted); margin-bottom: 16px; }
+    .chart-wrap { position: relative; }
+
+    /* ── TABLE CARDS ── */
+    .table-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .table-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+    }
+    .table-header h3 { font-size: 13px; font-weight: 700; }
+    .table-header p { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .table-scroll { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    thead th {
+      background: var(--card2);
+      padding: 10px 14px;
+      text-align: left;
+      font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .8px;
+      color: var(--muted);
+      cursor: pointer; white-space: nowrap;
+      user-select: none;
+    }
+    thead th:hover { color: var(--text); }
+    thead th.sort-active { color: var(--accent); }
+    tbody tr { border-top: 1px solid var(--border); transition: background .12s; }
+    tbody tr:hover { background: rgba(255,255,255,.03); }
+    tbody td { padding: 10px 14px; font-size: 12px; white-space: nowrap; }
+    .status-badge {
+      display: inline-block; padding: 2px 8px;
+      border-radius: 20px; font-size: 10px; font-weight: 700;
+    }
+    .s-clear { background: rgba(16,185,129,.15); color: #10b981; }
+    .s-pending { background: rgba(245,158,11,.15); color: #f59e0b; }
+    .s-defaulter { background: rgba(239,68,68,.15); color: #ef4444; }
+
+    /* ── FILTER SELECT ── */
+    .filter-select {
+      background: var(--bg); color: var(--text);
+      border: 1px solid var(--border);
+      padding: 6px 10px; border-radius: 7px; font-size: 11px;
+      outline: none; cursor: pointer;
+    }
+    .filter-select:focus { border-color: var(--accent); }
+
+    /* ── LOADING OVERLAY ── */
+    .loading-overlay {
+      position: fixed; inset: 0; background: rgba(15,23,42,.85);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 1000; font-size: 14px; color: var(--muted);
+      flex-direction: column; gap: 12px;
+      backdrop-filter: blur(4px);
+    }
+    .loading-overlay.hidden { display: none; }
+    .spinner {
+      width: 32px; height: 32px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 1100px) {
+      .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+      .grid-2-1 { grid-template-columns: 1fr; }
+      .grid-3 { grid-template-columns: 1fr 1fr; }
+      .settings-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 640px) {
+      .kpi-grid { grid-template-columns: 1fr; }
+      .grid-1-1 { grid-template-columns: 1fr; }
+      .grid-3 { grid-template-columns: 1fr; }
+      .main { padding: 14px; }
+    }
+
+    /* ── FOOTER ── */
+    .footer {
+      text-align: center; padding: 24px;
+      color: var(--muted); font-size: 11px; border-top: 1px solid var(--border);
+    }
+  </style>
+</head>
+<body>
+
+<!-- LOADING OVERLAY -->
+<div class="loading-overlay hidden" id="loadingOverlay">
+  <div class="spinner"></div>
+  <span>Loading data from Google Sheets…</span>
+</div>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="logo">
+    <div class="logo-icon">A</div>
+    <div class="logo-text">
+      <h1>Aura Nest</h1>
+      <p>Business Intelligence · Jan – Feb 2026</p>
+    </div>
+  </div>
+  <div class="header-right">
+    <span id="connectionBadge" class="badge badge-demo">Demo Mode</span>
+    <span class="last-updated" id="lastUpdated">—</span>
+    <button class="btn btn-ghost" onclick="refreshData()">↻ Refresh</button>
+    <button class="btn btn-ghost" onclick="toggleSettings()">⚙ Settings</button>
+  </div>
+</div>
+
+<!-- SETTINGS PANEL -->
+<div id="settingsPanel" class="settings-panel">
+  <h3>Connect Your Google Sheets</h3>
+  <div class="hint">
+    <strong>How to publish each tab as CSV:</strong>
+    Open your Google Sheet → File → Share → Publish to web → Select the tab (e.g. "Sales") → Change format to CSV → click Publish → Copy the URL.<br>
+    Paste each tab's URL below and click <strong>Connect &amp; Load</strong>. The dashboard auto-refreshes every 5 minutes.
+  </div>
+  <div class="settings-grid">
+    <div class="form-group">
+      <label>Sales / Orders Tab URL</label>
+      <input id="salesUrl" type="url" placeholder="https://docs.google.com/spreadsheets/d/e/…/pub?…&output=csv" />
+    </div>
+    <div class="form-group">
+      <label>Wallet / Bank Tab URL (PKR)</label>
+      <input id="walletUrl" type="url" placeholder="https://docs.google.com/spreadsheets/d/e/…/pub?…&output=csv" />
+    </div>
+    <div class="form-group">
+      <label>Wise Payments Tab URL</label>
+      <input id="wiseUrl" type="url" placeholder="https://docs.google.com/spreadsheets/d/e/…/pub?…&output=csv" />
+    </div>
+  </div>
+  <button class="btn btn-primary" onclick="connectSheets()">Connect &amp; Load</button>
+  <button class="btn btn-ghost" style="margin-left:8px" onclick="loadDemoData()">Preview Demo Data</button>
+</div>
+
+<!-- MAIN DASHBOARD -->
+<div class="main">
+
+  <!-- KPI ROW -->
+  <div class="section-title"><h2>Key Performance Indicators</h2></div>
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-emoji">📦</div>
+      <div class="kpi-label">Total Labels Sold</div>
+      <div class="kpi-value" id="kpiLabels">—</div>
+      <div class="kpi-sub" id="kpiLabelsSub">—</div>
+    </div>
+    <div class="kpi-card cyan">
+      <div class="kpi-emoji">💵</div>
+      <div class="kpi-label">Total Revenue</div>
+      <div class="kpi-value" id="kpiRevenue">—</div>
+      <div class="kpi-sub" id="kpiRevenueSub">—</div>
+      <div class="kpi-pkr" id="kpiRevenuePkr">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-emoji">📈</div>
+      <div class="kpi-label">Net Profit</div>
+      <div class="kpi-value" id="kpiProfit">—</div>
+      <div class="kpi-sub" id="kpiProfitSub">—</div>
+      <div class="kpi-pkr" id="kpiProfitPkr">—</div>
+    </div>
+    <div class="kpi-card warn">
+      <div class="kpi-emoji">⚠️</div>
+      <div class="kpi-label">Outstanding Unpaid</div>
+      <div class="kpi-value" id="kpiUnpaid">—</div>
+      <div class="kpi-sub" id="kpiUnpaidSub">—</div>
+    </div>
+  </div>
+
+  <!-- SALESPERSON + STATUS -->
+  <div class="section-title"><h2>Sales Performance</h2></div>
+  <div class="grid-2-1">
+    <div class="chart-card">
+      <h3>Revenue by Salesperson (USD)</h3>
+      <p>Total order value per team member · Jan–Feb 2026</p>
+      <div class="chart-wrap" style="height:260px"><canvas id="salespersonChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>Label Status</h3>
+      <p>Payment status distribution</p>
+      <div class="chart-wrap" style="height:260px"><canvas id="statusChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- CARRIER + SOURCE -->
+  <div class="grid-1-1" style="margin-top:14px">
+    <div class="chart-card">
+      <h3>Carrier Mix (by Labels)</h3>
+      <p>Breakdown of labels by carrier</p>
+      <div class="chart-wrap" style="height:220px"><canvas id="carrierChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>Lead Source (by Revenue)</h3>
+      <p>Organic vs Paid Ads contribution</p>
+      <div class="chart-wrap" style="height:220px"><canvas id="sourceChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- BANK CASH FLOW -->
+  <div class="section-title"><h2>Bank Cash Flow (PKR)</h2></div>
+  <div class="chart-card">
+    <h3>Running Bank Balance · Jan–Feb 2026</h3>
+    <p>Account balance over time — income events (↑) and major outflows (salaries, vendors, TWS) visible in trend</p>
+    <div class="chart-wrap" style="height:280px"><canvas id="cashFlowChart"></canvas></div>
+  </div>
+
+  <!-- EXPENSE BREAKDOWN + TOP CLIENTS -->
+  <div class="section-title"><h2>Financial Breakdown</h2></div>
+  <div class="grid-2-1">
+    <div class="chart-card">
+      <h3>Expense Categories (PKR)</h3>
+      <p>All debit transactions from bank account grouped by category</p>
+      <div class="chart-wrap" style="height:280px"><canvas id="expenseChart"></canvas></div>
+    </div>
+    <div class="chart-card" style="display:flex;flex-direction:column">
+      <h3>Top Clients by Revenue</h3>
+      <p>Highest-value clients Jan–Feb 2026</p>
+      <div id="topClientsTable" style="overflow:auto;flex:1"></div>
+    </div>
+  </div>
+
+  <!-- WISE SUMMARY -->
+  <div class="section-title"><h2>Wise Wallet Payments</h2></div>
+  <div class="table-card">
+    <div class="table-header">
+      <div><h3>Wise Payments Received</h3><p id="wiseCount">—</p></div>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Client</th>
+            <th>Amount (PKR)</th>
+            <th>Date</th>
+            <th>Note</th>
+          </tr>
+        </thead>
+        <tbody id="wiseTableBody">
+          <tr><td colspan="4" style="text-align:center;padding:30px;color:var(--muted)">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ALL ORDERS TABLE -->
+  <div class="section-title"><h2>All Orders — Client Payment Status</h2></div>
+  <div class="table-card">
+    <div class="table-header">
+      <div>
+        <h3>Client Orders</h3>
+        <p id="ordersCount">—</p>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <select class="filter-select" id="statusFilter" onchange="renderOrdersTable()">
+          <option value="all">All Statuses</option>
+          <option value="Pending">Pending</option>
+          <option value="Defaulter">Defaulters</option>
+          <option value="Clear">Cleared</option>
+        </select>
+        <select class="filter-select" id="spFilter" onchange="renderOrdersTable()">
+          <option value="all">All Salespersons</option>
+        </select>
+      </div>
+    </div>
+    <div class="table-scroll">
+      <table id="ordersTable">
+        <thead>
+          <tr>
+            <th onclick="sortTable('clientName')" id="th-clientName">Client ↕</th>
+            <th onclick="sortTable('salesperson')" id="th-salesperson">Salesperson ↕</th>
+            <th onclick="sortTable('carrier')" id="th-carrier">Carrier ↕</th>
+            <th onclick="sortTable('source')" id="th-source">Source ↕</th>
+            <th onclick="sortTable('totalLabels')" id="th-totalLabels">Labels ↕</th>
+            <th onclick="sortTable('totalAmount')" id="th-totalAmount">Total USD ↕</th>
+            <th onclick="sortTable('paidByClient')" id="th-paidByClient">Paid USD ↕</th>
+            <th onclick="sortTable('toBeP')" id="th-toBeP">Unpaid USD ↕</th>
+            <th onclick="sortTable('status')" id="th-status">Status ↕</th>
+            <th onclick="sortTable('date')" id="th-date">Date ↕</th>
+          </tr>
+        </thead>
+        <tbody id="ordersTableBody">
+          <tr><td colspan="10" style="text-align:center;padding:40px;color:var(--muted)">Loading data…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<div class="footer">
+  Aura Nest Business Dashboard · Auto-refreshes every 5 min when connected to Google Sheets · Demo data shown until sheets are connected
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// CONFIG & STATE
+// ══════════════════════════════════════════════════════════════
+const USD_TO_PKR = 278; // approximate rate – adjust as needed
+let config = { salesUrl: '', walletUrl: '', wiseUrl: '' };
+let salesData = [];
+let walletData = [];
+let wiseData = [];
+let chartInstances = {};
+let sortKey = 'totalAmount';
+let sortDir = -1;
+let refreshTimer = null;
+let countdown = 300;
+
+function loadConfigFromHash() {
+  try {
+    if (location.hash && location.hash.length > 1) {
+      config = JSON.parse(atob(location.hash.slice(1)));
+      if (document.getElementById('salesUrl')) document.getElementById('salesUrl').value = config.salesUrl || '';
+      if (document.getElementById('walletUrl')) document.getElementById('walletUrl').value = config.walletUrl || '';
+      if (document.getElementById('wiseUrl')) document.getElementById('wiseUrl').value = config.wiseUrl || '';
+    }
+  } catch(e) {}
+}
+
+function saveConfigToHash() {
+  config.salesUrl  = document.getElementById('salesUrl').value.trim();
+  config.walletUrl = document.getElementById('walletUrl').value.trim();
+  config.wiseUrl   = document.getElementById('wiseUrl').value.trim();
+  try { location.hash = btoa(JSON.stringify(config)); } catch(e) {}
+}
+
+// ══════════════════════════════════════════════════════════════
+// UI HELPERS
+// ══════════════════════════════════════════════════════════════
+function toggleSettings() {
+  document.getElementById('settingsPanel').classList.toggle('open');
+}
+function setConnectionStatus(connected) {
+  const b = document.getElementById('connectionBadge');
+  if (connected) { b.className = 'badge badge-connected'; b.textContent = '● Live'; }
+  else           { b.className = 'badge badge-demo';      b.textContent = 'Demo Mode'; }
+}
+function setLastUpdated(text) {
+  document.getElementById('lastUpdated').textContent = text || 'Updated: ' + new Date().toLocaleTimeString();
+}
+function showLoading(v) {
+  document.getElementById('loadingOverlay').classList.toggle('hidden', !v);
+}
+
+// ══════════════════════════════════════════════════════════════
+// GOOGLE SHEETS FETCH
+// ══════════════════════════════════════════════════════════════
+async function fetchCSV(url) {
+  const sep = url.includes('?') ? '&' : '?';
+  const res = await fetch(url + sep + '_t=' + Date.now());
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const text = await res.text();
+  return new Promise(resolve => {
+    Papa.parse(text, { header: true, skipEmptyLines: true, complete: r => resolve(r.data) });
+  });
+}
+
+async function connectSheets() {
+  saveConfigToHash();
+  if (!config.salesUrl && !config.walletUrl) {
+    alert('Please paste at least the Sales tab URL.');
+    return;
+  }
+  await refreshData();
+  document.getElementById('settingsPanel').classList.remove('open');
+}
+
+async function refreshData() {
+  if (!config.salesUrl && !config.walletUrl && !config.wiseUrl) { loadDemoData(); return; }
+  showLoading(true);
+  try {
+    const tasks = [];
+    if (config.salesUrl)  tasks.push(fetchCSV(config.salesUrl).then(d  => { salesData  = parseSalesData(d);  }));
+    if (config.walletUrl) tasks.push(fetchCSV(config.walletUrl).then(d => { walletData = parseWalletData(d); }));
+    if (config.wiseUrl)   tasks.push(fetchCSV(config.wiseUrl).then(d   => { wiseData   = parseWiseData(d);   }));
+    await Promise.all(tasks);
+    setConnectionStatus(true);
+    setLastUpdated();
+    renderAll();
+  } catch(e) {
+    alert('Could not load sheet data.\n\nMake sure the sheet is published to the web as CSV (File → Share → Publish to web).\n\nError: ' + e.message);
+  } finally {
+    showLoading(false);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// DATA PARSERS  (column names match your sheet headers)
+// ══════════════════════════════════════════════════════════════
+function col(row, ...keys) {
+  for (const k of keys) { if (row[k] !== undefined && row[k] !== '') return row[k]; }
+  return '';
+}
+function num(v) { return parseFloat(String(v).replace(/[$,\s]/g,'')) || 0; }
+
+function parseSalesData(rows) {
+  return rows.map(r => ({
+    source:       col(r,'Source','source'),
+    carrier:      col(r,'Carrier','carrier'),
+    totalLabels:  num(col(r,'Total Labels','TotalLabels')),
+    paidLabels:   num(col(r,'Paid Labels','PaidLabels')),
+    unpaidLabels: num(col(r,'Unpaid Labels','UnpaidLabels')),
+    status:       col(r,'Status','status'),
+    rate:         num(col(r,'Rate','rate')),
+    totalAmount:  num(col(r,'Total Amount','TotalAmount')),
+    paidByClient: num(col(r,'Paid by client','PaidByClient','Paid by Client')),
+    toBeP:        num(col(r,'To be paid Value','ToBePaid','To be paid')),
+    profit:       num(col(r,'Total Profit / Client','Total Profit','Profit')),
+    clientName:   col(r,'Client Name','ClientName','Client','client'),
+    salesperson:  col(r,'Sales Person','Salesperson','SalesPerson','salesperson'),
+    date:         col(r,'date','Date'),
+    email:        col(r,'email','Email'),
+  })).filter(r => r.clientName || r.totalAmount > 0);
+}
+
+function parseWalletData(rows) {
+  return rows.map(r => ({
+    date:        col(r,'Date','date'),
+    description: col(r,'Description','description'),
+    debit:       num(col(r,'Debit (PKR)','Debit','debit')),
+    credit:      num(col(r,'Credit (PKR)','Credit','credit')),
+    balance:     num(col(r,'Balance (PKR)','Balance','balance')),
+    type:        col(r,'Expense/Income','Type','type','Category'),
+  })).filter(r => r.date || r.description);
+}
+
+function parseWiseData(rows) {
+  return rows.map(r => ({
+    client: col(r,'Client','client','Name','name','Sender','sender'),
+    amount: num(col(r,'Amount','amount','Credit','credit')),
+    date:   col(r,'Date','date'),
+    note:   col(r,'Note','note','Description','description','Screenshot'),
+  })).filter(r => r.client || r.amount > 0);
+}
+
+// ══════════════════════════════════════════════════════════════
+// DEMO DATA
+// ══════════════════════════════════════════════════════════════
+function loadDemoData() {
+  salesData  = getDemoSales();
+  walletData = getDemoWallet();
+  wiseData   = getDemoWise();
+  setConnectionStatus(false);
+  renderAll();
+  setLastUpdated('Demo data loaded');
+}
+
+function getDemoSales() {
+  return [
+    {source:'Organic',  salesperson:'Farhad',   carrier:'USPS',      totalLabels:99,   paidLabels:99,   unpaidLabels:0,  status:'Clear',     rate:0.50, totalAmount:1257,   paidByClient:1257,  toBeP:0,    profit:2259,   clientName:'Blendmarts',   date:'2026-01-02'},
+    {source:'Organic',  salesperson:'Farhad',   carrier:'USPS',      totalLabels:63,   paidLabels:48,   unpaidLabels:15, status:'Pending',    rate:0.35, totalAmount:6229,   paidByClient:4751,  toBeP:1478, profit:8042,   clientName:'Sohail',       date:'2026-01-07'},
+    {source:'Organic',  salesperson:'Shafaqat', carrier:'USPS',      totalLabels:40,   paidLabels:0,    unpaidLabels:40, status:'Defaulter',  rate:0.35, totalAmount:3911,   paidByClient:0,     toBeP:3911, profit:-280,   clientName:'Umair Javed',  date:'2026-01-07'},
+    {source:'Paid Ads', salesperson:'Rehman',   carrier:'USPS',      totalLabels:2760, paidLabels:2764, unpaidLabels:0,  status:'Clear',     rate:0.50, totalAmount:385598, paidByClient:386161,toBeP:0,    profit:60566,  clientName:'Umair Javed',  date:'2026-01-07'},
+    {source:'Organic',  salesperson:'Farhad',   carrier:'USPS',      totalLabels:174,  paidLabels:113,  unpaidLabels:61, status:'Pending',    rate:0.35, totalAmount:17017,  paidByClient:11100, toBeP:5907, profit:11571,  clientName:'Talha',        date:'2026-01-08'},
+    {source:'Organic',  salesperson:'Farhad',   carrier:'USPS',      totalLabels:150,  paidLabels:95,   unpaidLabels:55, status:'Pending',    rate:0.30, totalAmount:12574,  paidByClient:8000,  toBeP:4574, profit:9975,   clientName:'MUBEEN',       date:'2026-01-10'},
+    {source:'Organic',  salesperson:'Shafaqat', carrier:'USPS',      totalLabels:124,  paidLabels:38,   unpaidLabels:86, status:'Clear',     rate:0.35, totalAmount:12127,  paidByClient:3730,  toBeP:8397, profit:3246,   clientName:'Jasmine',      date:'2026-01-10'},
+    {source:'Organic',  salesperson:'Farhad',   carrier:'USPS',      totalLabels:224,  paidLabels:187,  unpaidLabels:37, status:'Clear',     rate:0.35, totalAmount:21906,  paidByClient:18250, toBeP:3656, profit:14896,  clientName:'Bilal',        date:'2026-01-13'},
+    {source:'Paid Ads', salesperson:'MS',       carrier:'USPS',      totalLabels:188,  paidLabels:78,   unpaidLabels:110,status:'Clear',     rate:0.90, totalAmount:47278,  paidByClient:19698, toBeP:27580,profit:2502,   clientName:'Sohail',       date:'2026-01-13'},
+    {source:'Organic',  salesperson:'Farhad',   carrier:'FedEx',     totalLabels:14,   paidLabels:14,   unpaidLabels:0,  status:'Clear',     rate:1.40, totalAmount:5477,   paidByClient:5546,  toBeP:0,    profit:2009,   clientName:'Isfar',        date:'2026-01-14'},
+    {source:'Organic',  salesperson:'Shafaqat', carrier:'USPS',      totalLabels:214,  paidLabels:171,  unpaidLabels:42, status:'Clear',     rate:0.70, totalAmount:41857,  paidByClient:33580, toBeP:8277, profit:7231,   clientName:'Talha',        date:'2026-01-15'},
+    {source:'Organic',  salesperson:'MS',       carrier:'USPS',      totalLabels:568,  paidLabels:536,  unpaidLabels:32, status:'Clear',     rate:0.80, totalAmount:126968, paidByClient:119860,toBeP:7108, profit:37773,  clientName:'Khalid',       date:'2026-01-16'},
+    {source:'Organic',  salesperson:'Farhad',   carrier:'USPS',      totalLabels:111,  paidLabels:89,   unpaidLabels:22, status:'Clear',     rate:0.45, totalAmount:13957,  paidByClient:11190, toBeP:2767, profit:2437,   clientName:'Talha',        date:'2026-01-16'},
+    {source:'Organic',  salesperson:'Shafaqat', carrier:'USPS',      totalLabels:78,   paidLabels:57,   unpaidLabels:21, status:'Clear',     rate:0.35, totalAmount:7628,   paidByClient:5580,  toBeP:2048, profit:5187,   clientName:'Mazhar',       date:'2026-01-16'},
+    {source:'Organic',  salesperson:'Shafaqat', carrier:'USPS',      totalLabels:151,  paidLabels:145,  unpaidLabels:6,  status:'Clear',     rate:0.35, totalAmount:14767,  paidByClient:14170, toBeP:597,  profit:10042,  clientName:'Blendmarts',   date:'2026-01-23'},
+    {source:'Organic',  salesperson:'MS',       carrier:'USPS',      totalLabels:4200, paidLabels:4199, unpaidLabels:1,  status:'Clear',     rate:0.30, totalAmount:352067, paidByClient:352000,toBeP:67,   profit:279307, clientName:'MUBEEN',       date:'2026-01-23'},
+    {source:'Paid Ads', salesperson:'Rehman',   carrier:'USPS',      totalLabels:240,  paidLabels:236,  unpaidLabels:4,  status:'Clear',     rate:0.50, totalAmount:33530,  paidByClient:32947, toBeP:583,  profit:15960,  clientName:'KHALID',       date:'2026-01-23'},
+    {source:'Organic',  salesperson:'Rehman',   carrier:'Scan Form', totalLabels:215,  paidLabels:213,  unpaidLabels:2,  status:'Clear',     rate:1.35, totalAmount:81101,  paidByClient:80399, toBeP:702,  profit:48060,  clientName:'Umair Javed',  date:'2026-01-24'},
+    {source:'Organic',  salesperson:'MS',       carrier:'FedEx',     totalLabels:1144, paidLabels:1118, unpaidLabels:26, status:'Clear',     rate:0.80, totalAmount:255724, paidByClient:250054,toBeP:5670, profit:143845, clientName:'Blendmarts',   date:'2026-01-24'},
+    {source:'Paid Ads', salesperson:'Rehman',   carrier:'USPS',      totalLabels:131,  paidLabels:29,   unpaidLabels:0,  status:'Clear',     rate:0.40, totalAmount:14531,  paidByClient:14431, toBeP:0,    profit:1865,   clientName:'Sohail',       date:'2026-01-29'},
+    {source:'Organic',  salesperson:'Shafaqat', carrier:'USPS',      totalLabels:19,   paidLabels:15,   unpaidLabels:4,  status:'Clear',     rate:0.35, totalAmount:1858,   paidByClient:1500,  toBeP:358,  profit:1264,   clientName:'Blendmarts',   date:'2026-01-31'},
+    {source:'Organic',  salesperson:'Rehman',   carrier:'FedEx',     totalLabels:6,    paidLabels:5,    unpaidLabels:0,  status:'Clear',     rate:2.00, totalAmount:3353,   paidByClient:3324,  toBeP:29,   profit:1754,   clientName:'Bilal',        date:'2026-01-31'},
+    {source:'Organic',  salesperson:'Shafaqat', carrier:'USPS',      totalLabels:8,    paidLabels:8,    unpaidLabels:0,  status:'Clear',     rate:1.40, totalAmount:3129,   paidByClient:1100,  toBeP:19,   profit:1532,   clientName:'KHALID',       date:'2026-02-02'},
+    {source:'Paid Ads', salesperson:'Rehman',   carrier:'FedEx',     totalLabels:1,    paidLabels:1,    unpaidLabels:0,  status:'Clear',     rate:1.80, totalAmount:503,    paidByClient:503,   toBeP:0,    profit:126,    clientName:'Sohail',       date:'2026-02-02'},
+    {source:'Paid Ads', salesperson:'Rehman',   carrier:'FedEx',     totalLabels:22,   paidLabels:22,   unpaidLabels:0,  status:'Clear',     rate:0.65, totalAmount:3996,   paidByClient:3980,  toBeP:16,   profit:2766,   clientName:'Talha',        date:'2026-02-08'},
+    {source:'Organic',  salesperson:'Shafaqat', carrier:'USPS',      totalLabels:3,    paidLabels:3,    unpaidLabels:0,  status:'Clear',     rate:1.00, totalAmount:838,    paidByClient:837,   toBeP:0,    profit:397,    clientName:'Jasmine',      date:'2026-02-10'},
+    {source:'Paid Ads', salesperson:'Rehman',   carrier:'FedEx',     totalLabels:3,    paidLabels:3,    unpaidLabels:0,  status:'Clear',     rate:1.50, totalAmount:1257,   paidByClient:1259,  toBeP:0,    profit:687,    clientName:'Blendmarts',   date:'2026-02-10'},
+    {source:'Paid Ads', salesperson:'Rehman',   carrier:'FedEx',     totalLabels:9,    paidLabels:9,    unpaidLabels:0,  status:'Clear',     rate:1.10, totalAmount:2766,   paidByClient:2760,  toBeP:0,    profit:1132,   clientName:'Luanasports',  date:'2026-02-11'},
+    {source:'Paid Ads', salesperson:'Rehman',   carrier:'FedEx',     totalLabels:4,    paidLabels:4,    unpaidLabels:0,  status:'Clear',     rate:0.85, totalAmount:950,    paidByClient:952,   toBeP:0,    profit:503,    clientName:'Jasmine',      date:'2026-02-14'},
+    {source:'Paid Ads', salesperson:'Rehman',   carrier:'FedEx',     totalLabels:5,    paidLabels:5,    unpaidLabels:0,  status:'Clear',     rate:1.00, totalAmount:1397,   paidByClient:1400,  toBeP:0,    profit:629,    clientName:'Blendmarts',   date:'2026-02-15'},
+    {source:'Organic',  salesperson:'Farhad',   carrier:'USPS',      totalLabels:45,   paidLabels:25,   unpaidLabels:20, status:'Pending',    rate:0.30, totalAmount:3772,   paidByClient:1100,  toBeP:1672, profit:2993,   clientName:'Blendmarts',   date:'2026-02-15'},
+    {source:'Paid Ads', salesperson:'MS',       carrier:'USPS',      totalLabels:208,  paidLabels:200,  unpaidLabels:0,  status:'Clear',     rate:1.50, totalAmount:87179,  paidByClient:83805, toBeP:440,  profit:13832,  clientName:'Iliyas',       date:'2026-02-18'},
+    {source:'Paid Ads', salesperson:'Rehman',   carrier:'FedEx',     totalLabels:5,    paidLabels:5,    unpaidLabels:0,  status:'Clear',     rate:1.50, totalAmount:2096,   paidByClient:2100,  toBeP:0,    profit:1629,   clientName:'Jasmine',      date:'2026-02-19'},
+    {source:'Organic',  salesperson:'Shafaqat', carrier:'FedEx',     totalLabels:5,    paidLabels:5,    unpaidLabels:0,  status:'Clear',     rate:2.60, totalAmount:3632,   paidByClient:3630,  toBeP:0,    profit:1962,   clientName:'Isfar',        date:'2026-02-24'},
+    {source:'Paid Ads', salesperson:'Rehman',   carrier:'USPS',      totalLabels:11,   paidLabels:11,   unpaidLabels:0,  status:'Clear',     rate:0.40, totalAmount:1229,   paidByClient:1232,  toBeP:0,    profit:732,    clientName:'Hassan',       date:'2026-02-24'},
+    {source:'Paid Ads', salesperson:'Rehman',   carrier:'USPS',      totalLabels:14,   paidLabels:13,   unpaidLabels:0,  status:'Clear',     rate:0.45, totalAmount:1697,   paidByClient:1708,  toBeP:11,   profit:898,    clientName:'Jasmine',      date:'2026-02-25'},
+    {source:'Organic',  salesperson:'Shafaqat', carrier:'USPS',      totalLabels:11,   paidLabels:11,   unpaidLabels:0,  status:'Clear',     rate:1.50, totalAmount:4610,   paidByClient:4620,  toBeP:0,    profit:2288,   clientName:'Jasmine',      date:'2026-02-26'},
+    {source:'Paid Ads', salesperson:'MS',       carrier:'FedEx',     totalLabels:16,   paidLabels:16,   unpaidLabels:0,  status:'Clear',     rate:4.00, totalAmount:18447,  paidByClient:18447, toBeP:0,    profit:20750,  clientName:'Saad Arslan',  date:'2026-02-28'},
+    {source:'Paid Ads', salesperson:'Rehman',   carrier:'USPS',      totalLabels:37,   paidLabels:37,   unpaidLabels:0,  status:'Clear',     rate:0.60, totalAmount:6203,   paidByClient:6205,  toBeP:0,    profit:12461,  clientName:'Junaid',       date:'2026-02-28'},
+    {source:'Organic',  salesperson:'MS',       carrier:'USPS',      totalLabels:298,  paidLabels:297,  unpaidLabels:1,  status:'Clear',     rate:0.50, totalAmount:41633,  paidByClient:41480, toBeP:153,  profit:19817,  clientName:'Fauwaz',       date:'2026-02-17'},
+    {source:'Paid Ads', salesperson:'Rehman',   carrier:'FedEx',     totalLabels:48,   paidLabels:48,   unpaidLabels:0,  status:'Clear',     rate:0.80, totalAmount:10730,  paidByClient:10736, toBeP:0,    profit:7016,   clientName:'Zahid',        date:'2026-02-13'},
+    {source:'Paid Ads', salesperson:'Rehman',   carrier:'FedEx',     totalLabels:41,   paidLabels:41,   unpaidLabels:0,  status:'Clear',     rate:1.10, totalAmount:12602,  paidByClient:12630, toBeP:0,    profit:9415,   clientName:'Junaid',       date:'2026-02-07'},
+    {source:'Paid Ads', salesperson:'Shafaqat', carrier:'FedEx',     totalLabels:81,   paidLabels:81,   unpaidLabels:0,  status:'Clear',     rate:0.62, totalAmount:14032,  paidByClient:14000, toBeP:32,   profit:10185,  clientName:'Zaraiz',       date:'2026-02-05'},
+    {source:'Paid Ads', salesperson:'Rehman',   carrier:'FedEx Int.',totalLabels:42,   paidLabels:42,   unpaidLabels:0,  status:'Clear',     rate:7.00, totalAmount:82345,  paidByClient:82535, toBeP:0,    profit:154895, clientName:'Blendmarts',   date:'2026-01-12'},
+    {source:'Paid Ads', salesperson:'Shafaqat', carrier:'USPS',      totalLabels:47,   paidLabels:47,   unpaidLabels:0,  status:'Clear',     rate:1.60, totalAmount:21012,  paidByClient:21050, toBeP:0,    profit:10475,  clientName:'Junaid',       date:'2026-02-12'},
+    {source:'Paid Ads', salesperson:'Rehman',   carrier:'USPS',      totalLabels:149,  paidLabels:149,  unpaidLabels:0,  status:'Clear',     rate:0.60, totalAmount:25014,  paidByClient:25027, toBeP:0,    profit:10895,  clientName:'Junaid',       date:'2026-01-13'},
+    {source:'Paid Ads', salesperson:'Rehman',   carrier:'USPS',      totalLabels:200,  paidLabels:200,  unpaidLabels:0,  status:'Clear',     rate:0.40, totalAmount:22353,  paidByClient:22400, toBeP:47,   profit:22353,  clientName:'Ahsan',        date:'2026-01-13'},
+    {source:'Paid Ads', salesperson:'MS',       carrier:'USPS',      totalLabels:250,  paidLabels:250,  unpaidLabels:0,  status:'Clear',     rate:0.80, totalAmount:55884,  paidByClient:55825, toBeP:59,   profit:51662,  clientName:'Moosa',        date:'2026-01-14'},
+    {source:'Paid Ads', salesperson:'MS',       carrier:'USPS',      totalLabels:366,  paidLabels:333,  unpaidLabels:0,  status:'Clear',     rate:1.50, totalAmount:153401, paidByClient:139675,toBeP:105,  profit:40694,  clientName:'Stephen',      date:'2026-01-14'},
+    {source:'Paid Ads', salesperson:'Rehman',   carrier:'FedEx',     totalLabels:203,  paidLabels:204,  unpaidLabels:0,  status:'Clear',     rate:0.95, totalAmount:53886,  paidByClient:54038, toBeP:0,    profit:28513,  clientName:'Soyaib',       date:'2026-01-15'},
+    {source:'Paid Ads', salesperson:'MS',       carrier:'FedEx',     totalLabels:67,   paidLabels:69,   unpaidLabels:0,  status:'Clear',     rate:2.50, totalAmount:46803,  paidByClient:47890, toBeP:0,    profit:66842,  clientName:'Abdul Yousaf', date:'2026-01-15'},
+    {source:'Organic',  salesperson:'Rehman',   carrier:'USPS',      totalLabels:382,  paidLabels:382,  unpaidLabels:0,  status:'Clear',     rate:0.40, totalAmount:42695,  paidByClient:42738, toBeP:0,    profit:16490,  clientName:'Alwafa',       date:'2026-01-15'},
+    {source:'Paid Ads', salesperson:'Rehman',   carrier:'USPS',      totalLabels:687,  paidLabels:687,  unpaidLabels:0,  status:'Clear',     rate:0.35, totalAmount:67186,  paidByClient:67200, toBeP:0,    profit:24467,  clientName:'Abdul Yousaf', date:'2026-01-15'},
+    {source:'Organic',  salesperson:'Shafaqat', carrier:'USPS',      totalLabels:768,  paidLabels:768,  unpaidLabels:0,  status:'Clear',     rate:0.35, totalAmount:75108,  paidByClient:75140, toBeP:0,    profit:27368,  clientName:'Allure',       date:'2026-01-16'},
+    {source:'Paid Ads', salesperson:'Rehman',   carrier:'USPS',      totalLabels:734,  paidLabels:735,  unpaidLabels:0,  status:'Clear',     rate:0.30, totalAmount:61528,  paidByClient:61600, toBeP:0,    profit:19761,  clientName:'Iliyas',       date:'2026-01-16'},
+    {source:'Paid Ads', salesperson:'MS',       carrier:'USPS',      totalLabels:482,  paidLabels:482,  unpaidLabels:0,  status:'Clear',     rate:0.60, totalAmount:80808,  paidByClient:80831, toBeP:0,    profit:32056,  clientName:'Labib',        date:'2026-01-16'},
+    {source:'Paid Ads', salesperson:'MS',       carrier:'USPS',      totalLabels:194,  paidLabels:194,  unpaidLabels:0,  status:'Clear',     rate:2.50, totalAmount:135518, paidByClient:135485,toBeP:953,  profit:12499,  clientName:'Issac',        date:'2026-01-16'},
+    {source:'Organic',  salesperson:'Rehman',   carrier:'USPS',      totalLabels:66,   paidLabels:66,   unpaidLabels:0,  status:'Clear',     rate:0.80, totalAmount:14753,  paidByClient:14775, toBeP:0,    profit:4389,   clientName:'Ahsan',        date:'2026-01-12'},
+    {source:'Paid Ads', salesperson:'MS',       carrier:'Scan Form', totalLabels:65,   paidLabels:65,   unpaidLabels:0,  status:'Clear',     rate:1.70, totalAmount:30876,  paidByClient:30873, toBeP:0,    profit:31453,  clientName:'Hassan',       date:'2026-01-13'},
+    {source:'Paid Ads', salesperson:'MS',       carrier:'USPS',      totalLabels:95,   paidLabels:95,   unpaidLabels:0,  status:'Clear',     rate:1.10, totalAmount:29199,  paidByClient:29308, toBeP:0,    profit:23893,  clientName:'Ahsan',        date:'2026-01-13'},
+  ];
+}
+
+function getDemoWallet() {
+  return [
+    {date:'2026-01-02',description:'Income - 1LINK',          debit:0,       credit:52910,  balance:52910,  type:'Income'},
+    {date:'2026-01-03',description:'Service Charges',          debit:250,     credit:0,      balance:52660,  type:'Account Charges'},
+    {date:'2026-01-05',description:'Income - RAAST',           debit:0,       credit:4000,   balance:56660,  type:'Income'},
+    {date:'2026-01-07',description:'ASAD NADEEM - Scan',       debit:20000,   credit:0,      balance:36660,  type:'Scan Vendor'},
+    {date:'2026-01-07',description:'MUHAMMAD SUBHAN - Office', debit:5000,    credit:0,      balance:31660,  type:'Office Expenses'},
+    {date:'2026-01-08',description:'Income',                   debit:0,       credit:1890,   balance:33550,  type:'Income'},
+    {date:'2026-01-10',description:'Income',                   debit:0,       credit:16800,  balance:50350,  type:'Income'},
+    {date:'2026-01-12',description:'MUHAMMAD SUBHAN - Personal',debit:25000,  credit:0,      balance:25350,  type:'Subhan Personal'},
+    {date:'2026-01-13',description:'ASAD NADEEM - Scan',       debit:1847,    credit:0,      balance:23503,  type:'Scan Vendor'},
+    {date:'2026-01-13',description:'Income',                   debit:0,       credit:20670,  balance:44173,  type:'Income'},
+    {date:'2026-01-13',description:'KHURSHEED BANO',           debit:150000,  credit:0,      balance:-105827,type:'TWS'},
+    {date:'2026-01-14',description:'ASAD NADEEM',              debit:1847,    credit:0,      balance:-107674,type:'Scan Vendor'},
+    {date:'2026-01-14',description:'Income',                   debit:0,       credit:25516,  balance:-82158, type:'Income'},
+    {date:'2026-01-15',description:'Income multiple',          debit:0,       credit:53954,  balance:-28204, type:'Income'},
+    {date:'2026-01-15',description:'MUHAMMAD BILAL K - Refund',debit:14784,   credit:0,      balance:-42988, type:'Refund/Return'},
+    {date:'2026-01-16',description:'Income multiple',          debit:0,       credit:33770,  balance:-9218,  type:'Income'},
+    {date:'2026-01-16',description:'Funds Transfer Out',       debit:20000,   credit:0,      balance:-29218, type:'TWS'},
+    {date:'2026-01-19',description:'Income',                   debit:0,       credit:9360,   balance:-19858, type:'Income'},
+    {date:'2026-01-19',description:'ASAD NADEEM - Scan',       debit:6540,    credit:0,      balance:-26398, type:'Scan Vendor'},
+    {date:'2026-01-20',description:'Income',                   debit:0,       credit:8315,   balance:-18083, type:'Income'},
+    {date:'2026-01-20',description:'myABL TWS Transfer',       debit:126000,  credit:0,      balance:-144083,type:'TWS'},
+    {date:'2026-01-20',description:'ABDULLAH TWS',             debit:21348,   credit:0,      balance:-165431,type:'TWS'},
+    {date:'2026-01-21',description:'ASAD NADEEM - Scan',       debit:14110,   credit:0,      balance:-179541,type:'Scan Vendor'},
+    {date:'2026-01-21',description:'Income',                   debit:0,       credit:15720,  balance:-163821,type:'Income'},
+    {date:'2026-01-21',description:'ABDUL MUNEEB - FedEx',     debit:2520,    credit:0,      balance:-166341,type:'FedEx Vendor'},
+    {date:'2026-01-22',description:'Income',                   debit:0,       credit:7720,   balance:-158621,type:'Income'},
+    {date:'2026-01-23',description:'ABDUL MUNEEB - FedEx',     debit:9231,    credit:0,      balance:-167852,type:'FedEx Vendor'},
+    {date:'2026-01-23',description:'AZAM AZIZ - FedEx',        debit:2100,    credit:0,      balance:-169952,type:'FedEx Vendor'},
+    {date:'2026-01-23',description:'Income',                   debit:0,       credit:28231,  balance:-141721,type:'Income'},
+    {date:'2026-01-24',description:'Income',                   debit:0,       credit:15445,  balance:-126276,type:'Income'},
+    {date:'2026-01-26',description:'FedEx Vendors',            debit:5833,    credit:0,      balance:-132109,type:'FedEx Vendor'},
+    {date:'2026-01-26',description:'Income',                   debit:0,       credit:32056,  balance:-100053,type:'Income'},
+    {date:'2026-01-27',description:'Income',                   debit:0,       credit:44104,  balance:-55949, type:'Income'},
+    {date:'2026-01-28',description:'Income',                   debit:0,       credit:28380,  balance:-27569, type:'Income'},
+    {date:'2026-01-28',description:'EHSAN ULLAH KHAN - FedEx', debit:10000,   credit:0,      balance:-37569, type:'FedEx Vendor'},
+    {date:'2026-01-29',description:'Income',                   debit:0,       credit:60858,  balance:23289,  type:'Income'},
+    {date:'2026-01-29',description:'SIKANDAR ZULQARN - TWS',   debit:150000,  credit:0,      balance:-126711,type:'TWS'},
+    {date:'2026-01-29',description:'ABDUL MUNEEB - FedEx',     debit:24000,   credit:0,      balance:-150711,type:'FedEx Vendor'},
+    {date:'2026-01-30',description:'Income',                   debit:0,       credit:16168,  balance:-134543,type:'Income'},
+    {date:'2026-01-30',description:'ABDUL MUNEEB - FedEx',     debit:12360,   credit:0,      balance:-146903,type:'FedEx Vendor'},
+    {date:'2026-01-31',description:'Income',                   debit:0,       credit:49940,  balance:-96963, type:'Income'},
+    {date:'2026-02-02',description:'Income',                   debit:0,       credit:24474,  balance:-72489, type:'Income'},
+    {date:'2026-02-02',description:'Salaries - Bill Payment',  debit:32007,   credit:0,      balance:-104496,type:'Salaries'},
+    {date:'2026-02-02',description:'Income',                   debit:0,       credit:15268,  balance:-89228, type:'Income'},
+    {date:'2026-02-03',description:'Income',                   debit:0,       credit:88819,  balance:-409,   type:'Income'},
+    {date:'2026-02-03',description:'EHSAN ULLAH KHAN - FedEx', debit:10000,   credit:0,      balance:-10409, type:'FedEx Vendor'},
+    {date:'2026-02-03',description:'ASAD NADEEM - Scan',       debit:11200,   credit:0,      balance:-21609, type:'Scan Vendor'},
+    {date:'2026-02-04',description:'Income',                   debit:0,       credit:19250,  balance:-2359,  type:'Income'},
+    {date:'2026-02-06',description:'ABDUR REHMAN Salary',      debit:47911,   credit:0,      balance:-50270, type:'Salaries'},
+    {date:'2026-02-06',description:'MUHAMMAD FARHAD Salary',   debit:25000,   credit:0,      balance:-75270, type:'Salaries'},
+    {date:'2026-02-06',description:'SHAFQAT ALI Salary',       debit:4993,    credit:0,      balance:-80263, type:'Salaries'},
+    {date:'2026-02-06',description:'MUHAMMAD SUBHAN - Personal',debit:10000,  credit:0,      balance:-90263, type:'Subhan Personal'},
+    {date:'2026-02-06',description:'EHSAN ULLAH KHAN - FedEx', debit:22752,   credit:0,      balance:-113015,type:'FedEx Vendor'},
+    {date:'2026-02-06',description:'Income',                   debit:0,       credit:83459,  balance:-29556, type:'Income'},
+    {date:'2026-02-07',description:'Income',                   debit:0,       credit:55546,  balance:25990,  type:'Income'},
+    {date:'2026-02-09',description:'EHSAN ULLAH KHAN - FedEx', debit:15000,   credit:0,      balance:10990,  type:'FedEx Vendor'},
+    {date:'2026-02-09',description:'Income',                   debit:0,       credit:47406,  balance:58396,  type:'Income'},
+    {date:'2026-02-10',description:'Income',                   debit:0,       credit:109455, balance:167851, type:'Income'},
+    {date:'2026-02-10',description:'MUHAMMAD SUBHAN - Personal',debit:10000,  credit:0,      balance:157851, type:'Subhan Personal'},
+    {date:'2026-02-11',description:'Income',                   debit:0,       credit:55550,  balance:213401, type:'Income'},
+    {date:'2026-02-11',description:'WAQAS ALI - Refund',       debit:2750,    credit:0,      balance:210651, type:'Refund/Return'},
+    {date:'2026-02-11',description:'ABDUL MUNEEB - FedEx',     debit:15730,   credit:0,      balance:194921, type:'FedEx Vendor'},
+    {date:'2026-02-12',description:'ABDUR REHMAN Salary',      debit:8000,    credit:0,      balance:186921, type:'Salaries'},
+    {date:'2026-02-12',description:'Income',                   debit:0,       credit:28760,  balance:215681, type:'Income'},
+    {date:'2026-02-13',description:'Income',                   debit:0,       credit:25518,  balance:241199, type:'Income'},
+    {date:'2026-02-13',description:'MUHAMMAD SUBHAN Office',   debit:5000,    credit:0,      balance:236199, type:'Office Expenses'},
+    {date:'2026-02-13',description:'Income',                   debit:0,       credit:38960,  balance:275159, type:'Income'},
+    {date:'2026-02-13',description:'ABDUL MUNEEB - FedEx',     debit:30000,   credit:0,      balance:245159, type:'FedEx Vendor'},
+    {date:'2026-02-14',description:'Income',                   debit:0,       credit:34720,  balance:279879, type:'Income'},
+    {date:'2026-02-16',description:'MUHAMMAD SUBHAN Office',   debit:4000,    credit:0,      balance:275879, type:'Office Expenses'},
+    {date:'2026-02-16',description:'Income',                   debit:0,       credit:26200,  balance:302079, type:'Income'},
+    {date:'2026-02-17',description:'Income',                   debit:0,       credit:57680,  balance:359759, type:'Income'},
+    {date:'2026-02-18',description:'Income',                   debit:0,       credit:30120,  balance:389879, type:'Income'},
+    {date:'2026-02-19',description:'Income',                   debit:0,       credit:13818,  balance:403697, type:'Income'},
+    {date:'2026-02-20',description:'EHSAN ULLAH KHAN - FedEx', debit:45000,   credit:0,      balance:358697, type:'FedEx Vendor'},
+    {date:'2026-02-20',description:'Income',                   debit:0,       credit:57660,  balance:416357, type:'Income'},
+    {date:'2026-02-21',description:'Income',                   debit:0,       credit:3480,   balance:419837, type:'Income'},
+    {date:'2026-02-23',description:'Income',                   debit:0,       credit:7350,   balance:427187, type:'Income'},
+    {date:'2026-02-23',description:'MUHAMMAD NAEEM - Personal',debit:5090,    credit:0,      balance:422097, type:'Subhan Personal'},
+    {date:'2026-02-24',description:'Income',                   debit:0,       credit:168535, balance:590632, type:'Income'},
+    {date:'2026-02-25',description:'MUHAMMAD SUBHAN - TWS',    debit:201600,  credit:0,      balance:389032, type:'TWS'},
+    {date:'2026-02-25',description:'myABL Inter Branch - TWS', debit:100000,  credit:0,      balance:289032, type:'TWS'},
+    {date:'2026-02-25',description:'Income',                   debit:0,       credit:25100,  balance:314132, type:'Income'},
+    {date:'2026-02-26',description:'Income',                   debit:0,       credit:148714, balance:462846, type:'Income'},
+    {date:'2026-02-27',description:'ABDUR REHMAN - TWS',       debit:100000,  credit:0,      balance:362846, type:'TWS'},
+    {date:'2026-02-27',description:'EHSAN ULLAH KHAN - FedEx', debit:50000,   credit:0,      balance:312846, type:'FedEx Vendor'},
+    {date:'2026-02-27',description:'Income',                   debit:0,       credit:44580,  balance:357426, type:'Income'},
+    {date:'2026-02-27',description:'ABDUR REHMAN - TWS',       debit:100000,  credit:0,      balance:257426, type:'TWS'},
+    {date:'2026-02-28',description:'Income',                   debit:0,       credit:145859, balance:403285, type:'Income'},
+    {date:'2026-03-03',description:'Salaries',                 debit:100000,  credit:0,      balance:303285, type:'Salaries'},
+    {date:'2026-03-04',description:'ABDUR REHMAN Salary',      debit:128000,  credit:0,      balance:175285, type:'Salaries'},
+  ];
+}
+
+function getDemoWise() {
+  return [
+    {client:'Jasmine',      amount:8400,   date:'2026-01-07', note:'30$ jasmine 7/1/26'},
+    {client:'Jasmine',      amount:2800,   date:'2026-01-07', note:'10$ jasmine 7/1/26'},
+    {client:'Jasmine',      amount:28000,  date:'2026-01-13', note:'100$ jasmine 13/1/26'},
+    {client:'Jasmine',      amount:22400,  date:'2026-01-28', note:'79.09$ jasmine 28/1/26'},
+    {client:'Jasmine',      amount:11200,  date:'2026-02-10', note:'40$ jasmine 10/2/26'},
+    {client:'Jasmine',      amount:14000,  date:'2026-02-08', note:'50$ jasmine 8/2/26'},
+    {client:'Jasmine',      amount:22400,  date:'2026-02-14', note:'80$ jasmine 14/2/26'},
+    {client:'Jasmine',      amount:14000,  date:'2026-02-28', note:'50$ Jasmine 28/2/26'},
+    {client:'Isfar',        amount:3164,   date:'2026-02-24', note:'3164 isfar 24/2/26'},
+    {client:'Saad Arslan',  amount:18447,  date:'2026-02-01', note:'Saad Arslan 66$'},
+    {client:'Soyaib',       amount:279257, date:'2026-01-15', note:'Soyaib Wise'},
+    {client:'Stephen',      amount:139675, date:'2026-01-14', note:'Stephen 500$'},
+    {client:'Abdul Yousaf', amount:28150,  date:'2026-01-15', note:'Abdul Yousaf 28150'},
+    {client:'Allure',       amount:55870,  date:'2026-01-16', note:'200$ Allure'},
+    {client:'Iliyas',       amount:83805,  date:'2026-01-16', note:'Iliyas 300$'},
+    {client:'Labib/Hmav',   amount:81656,  date:'2026-01-16', note:'81,656.27 Labib'},
+    {client:'Naeem',        amount:50571,  date:'2026-01-16', note:'Naeem Wise'},
+    {client:'Issac',        amount:6956,   date:'2026-01-16', note:'6960 issac'},
+    {client:'Noah',         amount:46056,  date:'2026-01-19', note:'Noah Wise'},
+    {client:'USPS Payment', amount:1059796,date:'2026-01-31', note:'USPS Vendor Payment'},
+  ];
+}
+
+// ══════════════════════════════════════════════════════════════
+// AGGREGATION
+// ══════════════════════════════════════════════════════════════
+function aggregate() {
+  const totalLabels   = salesData.reduce((s,r) => s + r.totalLabels, 0);
+  const totalRevenue  = salesData.reduce((s,r) => s + r.totalAmount, 0);
+  const totalProfit   = salesData.reduce((s,r) => s + r.profit, 0);
+  const totalUnpaid   = salesData.filter(r => r.status !== 'Clear').reduce((s,r) => s + r.toBeP, 0);
+  const clearCount    = salesData.filter(r => r.status === 'Clear').length;
+  const pendingCount  = salesData.filter(r => r.status === 'Pending').length;
+  const defaulterCount= salesData.filter(r => r.status === 'Defaulter').length;
+
+  const bySP = {};
+  salesData.forEach(r => {
+    const sp = r.salesperson || 'Unknown';
+    if (!bySP[sp]) bySP[sp] = { labels: 0, revenue: 0, count: 0 };
+    bySP[sp].labels  += r.totalLabels;
+    bySP[sp].revenue += r.totalAmount;
+    bySP[sp].count++;
+  });
+
+  const byCarrier = {};
+  salesData.forEach(r => {
+    const c = r.carrier || 'Other';
+    if (!byCarrier[c]) byCarrier[c] = 0;
+    byCarrier[c] += r.totalLabels;
+  });
+
+  const bySource = {};
+  salesData.forEach(r => {
+    const s = r.source || 'Unknown';
+    if (!bySource[s]) bySource[s] = 0;
+    bySource[s] += r.totalAmount;
+  });
+
+  const expByType = {};
+  walletData.filter(r => r.debit > 0 && r.type && r.type !== 'Income').forEach(r => {
+    if (!expByType[r.type]) expByType[r.type] = 0;
+    expByType[r.type] += r.debit;
+  });
+
+  const clientMap = {};
+  salesData.forEach(r => {
+    const c = r.clientName || 'Unknown';
+    if (!clientMap[c]) clientMap[c] = { revenue: 0, labels: 0, sp: r.salesperson };
+    clientMap[c].revenue += r.totalAmount;
+    clientMap[c].labels  += r.totalLabels;
+  });
+  const topClients = Object.entries(clientMap).sort((a,b) => b[1].revenue - a[1].revenue).slice(0, 10);
+
+  return { totalLabels, totalRevenue, totalProfit, totalUnpaid,
+           clearCount, pendingCount, defaulterCount,
+           bySP, byCarrier, bySource, expByType, topClients };
+}
+
+// ══════════════════════════════════════════════════════════════
+// FORMAT HELPERS
+// ══════════════════════════════════════════════════════════════
+function fmtUSD(n) {
+  if (n >= 1e6) return '$' + (n/1e6).toFixed(2) + 'M';
+  if (n >= 1e3) return '$' + (n/1e3).toFixed(1) + 'K';
+  return '$' + Math.round(n).toLocaleString();
+}
+function fmtPKR(n) {
+  if (n >= 1e6) return 'PKR ' + (n/1e6).toFixed(2) + 'M';
+  if (n >= 1e3) return 'PKR ' + (n/1e3).toFixed(1) + 'K';
+  return 'PKR ' + Math.round(n).toLocaleString();
+}
+function fmtNum(n) { return Math.round(n).toLocaleString(); }
+
+// ══════════════════════════════════════════════════════════════
+// CHART HELPERS
+// ══════════════════════════════════════════════════════════════
+const COLORS = ['#10b981','#06b6d4','#3b82f6','#8b5cf6','#f59e0b','#ec4899','#ef4444','#64748b'];
+const CHART_DEFAULTS = {
+  responsive: true, maintainAspectRatio: false,
+  plugins: {
+    legend: { labels: { color: '#94a3b8', font: { size: 11 }, padding: 12, boxWidth: 12 } },
+    tooltip: {
+      backgroundColor: '#1e293b', borderColor: '#334155', borderWidth: 1,
+      titleColor: '#f1f5f9', bodyColor: '#94a3b8', padding: 10,
+    },
+  },
+};
+function mkChart(id, type, data, extraOpts = {}) {
+  if (chartInstances[id]) chartInstances[id].destroy();
+  const ctx = document.getElementById(id).getContext('2d');
+  const scalesOpts = (type !== 'doughnut' && type !== 'pie') ? {
+    scales: {
+      x: { ticks: { color: '#94a3b8', font: {size: 11} }, grid: { color: '#1e293b' } },
+      y: { ticks: { color: '#94a3b8', font: {size: 11} }, grid: { color: '#334155' } },
+    },
+  } : {};
+  chartInstances[id] = new Chart(ctx, {
+    type, data,
+    options: { ...CHART_DEFAULTS, ...scalesOpts, ...extraOpts },
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+// RENDER ALL
+// ══════════════════════════════════════════════════════════════
+function renderAll() {
+  const m = aggregate();
+  updateKPIs(m);
+  renderSPChart(m);
+  renderStatusChart(m);
+  renderCarrierChart(m);
+  renderSourceChart(m);
+  renderCashFlow();
+  renderExpenseChart(m);
+  renderTopClients(m);
+  renderWiseTable();
+  populateSPFilter();
+  renderOrdersTable();
+}
+
+function updateKPIs(m) {
+  document.getElementById('kpiLabels').textContent    = fmtNum(m.totalLabels);
+  document.getElementById('kpiLabelsSub').textContent = `${salesData.length} orders · ${m.clearCount} clear / ${m.pendingCount} pending / ${m.defaulterCount} defaulter`;
+
+  document.getElementById('kpiRevenue').textContent    = fmtUSD(m.totalRevenue);
+  document.getElementById('kpiRevenueSub').textContent = `Jan + Feb 2026 combined`;
+  document.getElementById('kpiRevenuePkr').textContent = '≈ ' + fmtPKR(m.totalRevenue * USD_TO_PKR);
+
+  document.getElementById('kpiProfit').textContent    = fmtUSD(m.totalProfit);
+  document.getElementById('kpiProfitSub').textContent = `Margin: ${m.totalRevenue > 0 ? ((m.totalProfit/m.totalRevenue)*100).toFixed(1) : 0}%`;
+  document.getElementById('kpiProfitPkr').textContent = '≈ ' + fmtPKR(m.totalProfit * USD_TO_PKR);
+
+  document.getElementById('kpiUnpaid').textContent    = fmtUSD(m.totalUnpaid);
+  document.getElementById('kpiUnpaidSub').textContent = `${m.pendingCount + m.defaulterCount} clients with open balances`;
+}
+
+function renderSPChart(m) {
+  const sps     = Object.keys(m.bySP).sort();
+  const revenues = sps.map(sp => m.bySP[sp].revenue);
+  const labels   = sps.map(sp => m.bySP[sp].labels);
+  mkChart('salespersonChart', 'bar', {
+    labels: sps,
+    datasets: [
+      { label: 'Revenue (USD)', data: revenues, backgroundColor: COLORS, borderRadius: 5, yAxisID: 'y' },
+      { label: 'Labels Sold',   data: labels,   backgroundColor: COLORS.map(c=>c+'44'), borderRadius: 5, yAxisID: 'y1' },
+    ],
+  }, {
+    scales: {
+      x:  { ticks: { color: '#94a3b8', font:{size:12} }, grid: { color: '#1e293b' } },
+      y:  { type:'linear', position:'left',  ticks: { color:'#94a3b8', callback: v => '$'+(v/1000).toFixed(0)+'K' }, grid: { color:'#334155' } },
+      y1: { type:'linear', position:'right', ticks: { color:'#94a3b8' }, grid: { drawOnChartArea: false } },
+    },
+  });
+}
+
+function renderStatusChart(m) {
+  mkChart('statusChart', 'doughnut', {
+    labels: ['Clear', 'Pending', 'Defaulter'],
+    datasets: [{ data: [m.clearCount, m.pendingCount, m.defaulterCount],
+      backgroundColor: ['#10b981','#f59e0b','#ef4444'], borderColor:'#1e293b', borderWidth: 3 }],
+  }, { cutout:'65%', plugins:{ legend:{ position:'bottom', labels:{ color:'#94a3b8', padding:14 } } } });
+}
+
+function renderCarrierChart(m) {
+  const carriers = Object.keys(m.byCarrier).filter(c => m.byCarrier[c] > 0);
+  mkChart('carrierChart', 'doughnut', {
+    labels: carriers,
+    datasets: [{ data: carriers.map(c => m.byCarrier[c]),
+      backgroundColor: COLORS, borderColor:'#1e293b', borderWidth: 3 }],
+  }, { cutout:'60%', plugins:{ legend:{ position:'bottom', labels:{ color:'#94a3b8', padding:10, font:{size:10} } } } });
+}
+
+function renderSourceChart(m) {
+  const sources = Object.keys(m.bySource);
+  mkChart('sourceChart', 'doughnut', {
+    labels: sources,
+    datasets: [{ data: sources.map(s => m.bySource[s]),
+      backgroundColor: ['#10b981','#06b6d4','#f59e0b'], borderColor:'#1e293b', borderWidth: 3 }],
+  }, { cutout:'60%', plugins:{ legend:{ position:'bottom', labels:{ color:'#94a3b8', padding:10, font:{size:10} } } } });
+}
+
+function renderCashFlow() {
+  if (!walletData.length) return;
+  const sorted = [...walletData].sort((a,b) => new Date(a.date) - new Date(b.date));
+  const labels   = sorted.map(r => { const d=new Date(r.date); return d.toLocaleDateString('en',{month:'short',day:'numeric'}); });
+  const balances = sorted.map(r => r.balance);
+  mkChart('cashFlowChart', 'line', {
+    labels,
+    datasets: [{
+      label: 'Balance (PKR)',
+      data: balances,
+      borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,.1)',
+      fill: true, tension: 0.35, pointRadius: 2, pointHoverRadius: 5,
+    }],
+  }, {
+    scales: {
+      x: { ticks:{ color:'#94a3b8', maxTicksLimit:18, font:{size:10} }, grid:{ color:'#1e293b' } },
+      y: { ticks:{ color:'#94a3b8', callback: v => fmtPKR(v), font:{size:10} }, grid:{ color:'#334155' } },
+    },
+  });
+}
+
+function renderExpenseChart(m) {
+  const entries = Object.entries(m.expByType).sort((a,b) => b[1]-a[1]).slice(0,9);
+  mkChart('expenseChart', 'bar', {
+    labels: entries.map(e => e[0]),
+    datasets: [{ label:'PKR', data: entries.map(e => e[1]), backgroundColor: COLORS, borderRadius: 5 }],
+  }, {
+    indexAxis: 'y',
+    scales: {
+      x: { ticks:{ color:'#94a3b8', callback: v => fmtPKR(v), font:{size:10} }, grid:{ color:'#334155' } },
+      y: { ticks:{ color:'#94a3b8', font:{size:11} }, grid:{ color:'#1e293b' } },
+    },
+    plugins:{ legend:{ display: false } },
+  });
+}
+
+function renderTopClients(m) {
+  const rows = m.topClients.map(([name,d], i) => `
+    <tr style="border-top:1px solid var(--border)">
+      <td style="padding:8px 12px;color:var(--muted);font-size:11px">#${i+1}</td>
+      <td style="padding:8px 12px;font-weight:600;font-size:13px">${name}</td>
+      <td style="padding:8px 12px;color:var(--accent);font-size:12px;font-weight:700">${fmtUSD(d.revenue)}</td>
+      <td style="padding:8px 12px;color:var(--muted);font-size:12px">${fmtNum(d.labels)}</td>
+    </tr>`).join('');
+  document.getElementById('topClientsTable').innerHTML = `
+    <table style="width:100%;border-collapse:collapse">
+      <thead><tr style="background:var(--card2)">
+        <th style="padding:8px 12px;font-size:10px;color:var(--muted);text-align:left;font-weight:700;text-transform:uppercase">#</th>
+        <th style="padding:8px 12px;font-size:10px;color:var(--muted);text-align:left;font-weight:700;text-transform:uppercase">CLIENT</th>
+        <th style="padding:8px 12px;font-size:10px;color:var(--muted);text-align:left;font-weight:700;text-transform:uppercase">REVENUE</th>
+        <th style="padding:8px 12px;font-size:10px;color:var(--muted);text-align:left;font-weight:700;text-transform:uppercase">LABELS</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function renderWiseTable() {
+  document.getElementById('wiseCount').textContent = `${wiseData.length} transactions`;
+  const rows = wiseData.map(r => `
+    <tr>
+      <td><strong>${r.client}</strong></td>
+      <td style="color:var(--accent);font-weight:600">${fmtPKR(r.amount)}</td>
+      <td style="color:var(--muted)">${r.date}</td>
+      <td style="color:var(--muted);font-size:11px">${r.note}</td>
+    </tr>`).join('');
+  document.getElementById('wiseTableBody').innerHTML = rows ||
+    '<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--muted)">No Wise data — connect Wise tab URL in Settings</td></tr>';
+}
+
+// ══════════════════════════════════════════════════════════════
+// ORDERS TABLE
+// ══════════════════════════════════════════════════════════════
+let currentSort = { key: 'totalAmount', dir: -1 };
+
+function sortTable(key) {
+  if (currentSort.key === key) currentSort.dir *= -1;
+  else { currentSort.key = key; currentSort.dir = -1; }
+  // Update active header highlight
+  document.querySelectorAll('thead th').forEach(th => th.classList.remove('sort-active'));
+  const th = document.getElementById('th-' + key);
+  if (th) th.classList.add('sort-active');
+  renderOrdersTable();
+}
+
+function populateSPFilter() {
+  const filter = document.getElementById('spFilter');
+  const sps = [...new Set(salesData.map(r => r.salesperson).filter(Boolean))].sort();
+  filter.innerHTML = '<option value="all">All Salespersons</option>' +
+    sps.map(sp => `<option value="${sp}">${sp}</option>`).join('');
+}
+
+function renderOrdersTable() {
+  const statusF = document.getElementById('statusFilter').value;
+  const spF     = document.getElementById('spFilter').value;
+  let data = [...salesData];
+  if (statusF !== 'all') data = data.filter(r => r.status === statusF);
+  if (spF     !== 'all') data = data.filter(r => r.salesperson === spF);
+
+  data.sort((a, b) => {
+    let av = a[currentSort.key] ?? 0;
+    let bv = b[currentSort.key] ?? 0;
+    if (typeof av === 'string') return av.localeCompare(bv) * currentSort.dir;
+    return (av - bv) * currentSort.dir;
+  });
+
+  document.getElementById('ordersCount').textContent = `${data.length} records`;
+
+  const statusClass = { Clear: 's-clear', Pending: 's-pending', Defaulter: 's-defaulter' };
+  document.getElementById('ordersTableBody').innerHTML = data.length ? data.map(r => `
+    <tr>
+      <td><strong>${r.clientName || '—'}</strong></td>
+      <td>${r.salesperson || '—'}</td>
+      <td>${r.carrier || '—'}</td>
+      <td style="color:var(--muted)">${r.source || '—'}</td>
+      <td>${fmtNum(r.totalLabels)}</td>
+      <td style="color:var(--accent2)">${fmtUSD(r.totalAmount)}</td>
+      <td>${fmtUSD(r.paidByClient)}</td>
+      <td style="color:${r.toBeP > 0 ? 'var(--warn)' : 'var(--muted)'}">${r.toBeP > 0 ? fmtUSD(r.toBeP) : '—'}</td>
+      <td><span class="status-badge ${statusClass[r.status] || ''}">${r.status || '—'}</span></td>
+      <td style="color:var(--muted);font-size:11px">${r.date || '—'}</td>
+    </tr>`).join('') :
+    '<tr><td colspan="10" style="text-align:center;padding:32px;color:var(--muted)">No records match filters</td></tr>';
+}
+
+// ══════════════════════════════════════════════════════════════
+// AUTO-REFRESH
+// ══════════════════════════════════════════════════════════════
+function startCountdown() {
+  countdown = 300;
+  if (refreshTimer) clearInterval(refreshTimer);
+  refreshTimer = setInterval(() => {
+    countdown--;
+    const isLive = config.salesUrl || config.walletUrl;
+    if (isLive) {
+      const m = Math.floor(countdown/60), s = String(countdown%60).padStart(2,'0');
+      document.getElementById('lastUpdated').textContent = `Refresh in ${m}:${s}`;
+    }
+    if (countdown <= 0) {
+      countdown = 300;
+      if (isLive) refreshData();
+    }
+  }, 1000);
+}
+
+// ══════════════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  loadConfigFromHash();
+  if (config.salesUrl || config.walletUrl) {
+    refreshData();
+  } else {
+    loadDemoData();
+    setTimeout(() => document.getElementById('settingsPanel').classList.add('open'), 600);
+  }
+  startCountdown();
+});
+</script>
+</body>
+</html>

@@ -66,6 +66,10 @@ jspm_packages/
 ehthumbs.db
 Thumbs.db
 
+# Claude Code session files
+.claude/
+master-security-analysis-prompt.md
+
 # Debug files
 debug.log
 
