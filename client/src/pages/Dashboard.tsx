@@ -7,7 +7,6 @@ import {
   UserGroupIcon, ArrowUpRightIcon, ClockIcon, SparklesIcon,
   InformationCircleIcon, ArrowTrendingUpIcon,
 } from '@heroicons/react/24/outline';
-import { getUspsZone1Rate } from '../utils/uspsRates';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface UserStats {

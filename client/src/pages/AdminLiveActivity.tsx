@@ -169,10 +169,10 @@ const AdminLiveActivity: React.FC = () => {
 
     socket.on('admin-label-generated', handler);
     return () => { socket.off('admin-label-generated', handler); };
-  }, [socket]);
+  }, [socket, redrawMap]);
 
   // ── D3 choropleth ──────────────────────────────────────────
-  function redrawMap() {
+  const redrawMap = useCallback(() => {
     if (!mapRef.current) return;
     if (!mapReady.current) {
       drawMap();
@@ -187,7 +187,7 @@ const AdminLiveActivity: React.FC = () => {
         const v = stateMap.current[d?.properties?.name] || 0;
         return v > 0 ? colorScale(v) : '#E2E8F0';
       });
-  }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function drawMap() {
     if (mapReady.current || !mapRef.current) return;
