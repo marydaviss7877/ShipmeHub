@@ -135,6 +135,24 @@ const AdminLiveActivity: React.FC = () => {
     return () => clearInterval(iv);
   }, [fetchStats]);
 
+  // ── D3 choropleth ──────────────────────────────────────────
+  const redrawMap = useCallback(() => {
+    if (!mapRef.current) return;
+    if (!mapReady.current) {
+      drawMap();
+      return;
+    }
+    // Update fill colors only
+    const vals = Object.values(stateMap.current);
+    const maxVal = vals.length ? Math.max(...vals) : 1;
+    const colorScale = d3.scaleQuantize<string>().domain([0, maxVal]).range(AMBER_STOPS);
+    d3.select(mapRef.current).selectAll<SVGPathElement, any>('path')
+      .attr('fill', (d: any) => {
+        const v = stateMap.current[d?.properties?.name] || 0;
+        return v > 0 ? colorScale(v) : '#E2E8F0';
+      });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Socket real-time events ────────────────────────────────
   useEffect(() => {
     if (!socket) return;
@@ -170,24 +188,6 @@ const AdminLiveActivity: React.FC = () => {
     socket.on('admin-label-generated', handler);
     return () => { socket.off('admin-label-generated', handler); };
   }, [socket, redrawMap]);
-
-  // ── D3 choropleth ──────────────────────────────────────────
-  const redrawMap = useCallback(() => {
-    if (!mapRef.current) return;
-    if (!mapReady.current) {
-      drawMap();
-      return;
-    }
-    // Update fill colors only
-    const vals = Object.values(stateMap.current);
-    const maxVal = vals.length ? Math.max(...vals) : 1;
-    const colorScale = d3.scaleQuantize<string>().domain([0, maxVal]).range(AMBER_STOPS);
-    d3.select(mapRef.current).selectAll<SVGPathElement, any>('path')
-      .attr('fill', (d: any) => {
-        const v = stateMap.current[d?.properties?.name] || 0;
-        return v > 0 ? colorScale(v) : '#E2E8F0';
-      });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function drawMap() {
     if (mapReady.current || !mapRef.current) return;
