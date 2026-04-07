@@ -21,10 +21,10 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       const serverUrl = apiUrl.replace(/\/api\/?$/, '');
 
       const newSocket = io(serverUrl, {
-        transports: ['websocket'],
+        // Use default transports (polling → websocket upgrade).
+        // Forcing websocket-only skips the HTTP handshake, so auth errors
+        // surface as an opaque "websocket error" with no useful message.
         autoConnect: true,
-        // Pass JWT in handshake auth — the server verifies it and auto-joins
-        // the socket to the user's own room. Never use query params for tokens.
         auth: { token },
       });
 

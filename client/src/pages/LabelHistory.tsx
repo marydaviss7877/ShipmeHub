@@ -36,15 +36,25 @@ function getTrackUrl(carrier: string, trackingId: string): string {
   return `https://tools.usps.com/go/TrackConfirmAction?tLabels=${id}`;
 }
 
-async function downloadFile(url: string, filename: string) {
+// Fetch a label PDF via our own API proxy (avoids S3 CORS / auth header issues)
+async function fetchLabelPdf(labelId: string): Promise<string | null> {
   try {
-    const res = await axios.get(url, { responseType: 'blob' });
-    const blobUrl = window.URL.createObjectURL(new Blob([res.data]));
-    const a = document.createElement('a');
-    a.href = blobUrl; a.download = filename;
-    document.body.appendChild(a); a.click(); a.remove();
-    window.URL.revokeObjectURL(blobUrl);
-  } catch (e) { console.error('Download failed', e); }
+    const res = await axios.get(`/labels/${labelId}/pdf`, { responseType: 'blob' });
+    return window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+  } catch (e) {
+    console.error('PDF fetch failed', e);
+    return null;
+  }
+}
+
+async function downloadLabelPdf(labelId: string, trackingId: string) {
+  const blobUrl = await fetchLabelPdf(labelId);
+  if (!blobUrl) return;
+  const a = document.createElement('a');
+  a.href = blobUrl;
+  a.download = `label-${trackingId || labelId}.pdf`;
+  document.body.appendChild(a); a.click(); a.remove();
+  window.URL.revokeObjectURL(blobUrl);
 }
 
 // ── Carrier theme ─────────────────────────────────────────────
@@ -189,9 +199,8 @@ const LabelHistory: React.FC = () => {
   };
 
   const openPdf = async (label: Label) => {
-    const res = await axios.get(label.pdfUrl!, { responseType: 'blob' });
-    const blobUrl = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
-    setViewPdf({ url: blobUrl, trackingId: label.trackingId });
+    const blobUrl = await fetchLabelPdf(label._id);
+    if (blobUrl) setViewPdf({ url: blobUrl, trackingId: label.trackingId });
   };
 
   // Pagination page numbers
@@ -515,7 +524,7 @@ const LabelHistory: React.FC = () => {
                                   </button>
                                   <div style={{ height: 1, background: '#F1F5F9', margin: '0 0.625rem' }} />
                                   <button
-                                    onClick={() => { downloadFile(label.pdfUrl!, `label-${label.trackingId || label._id}.pdf`); setOpenAction(null); }}
+                                    onClick={() => { downloadLabelPdf(label._id, label.trackingId); setOpenAction(null); }}
                                     style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '0.625rem 0.875rem', border: 'none', background: 'none', cursor: 'pointer', fontSize: '0.78rem', color: '#1E293B', fontWeight: 600, textAlign: 'left', transition: 'background 0.12s' }}
                                     onMouseEnter={e => (e.currentTarget.style.background = '#F8FAFC')}
                                     onMouseLeave={e => (e.currentTarget.style.background = 'none')}>

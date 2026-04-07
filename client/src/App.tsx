@@ -21,6 +21,7 @@ import VendorManagement from './pages/VendorManagement';
 import UserVendorAccess from './pages/UserVendorAccess';
 import AdminManifestOps from './pages/AdminManifestOps';
 import LiveActivity from './pages/LiveActivity';
+import AdminLiveActivity from './pages/AdminLiveActivity';
 import VendorLogin from './pages/vendor/VendorLogin';
 import VendorDashboard from './pages/vendor/VendorDashboard';
 import VendorJobDetail from './pages/vendor/VendorJobDetail';
@@ -98,6 +99,7 @@ function App() {
                   <Route path="admin/financial-dashboard"    element={<AdminOnly><FinancialDashboard /></AdminOnly>} />
                   <Route path="admin/settings"              element={<AdminOnly><Settings /></AdminOnly>} />
                   <Route path="admin/attendance"            element={<AdminOnly><AttendanceAdmin /></AdminOnly>} />
+                  <Route path="admin/live"                 element={<AdminOnly><AdminLiveActivity /></AdminOnly>} />
 
                   {/* Reseller routes (admin can also access) */}
                   <Route path="reseller/clients"  element={<AdminOrReseller><ResellerClients /></AdminOrReseller>} />

@@ -162,13 +162,24 @@ async function createSingleLabel(labelData) {
   const { buffer, contentType, statusCode } = await apiRequestBinary('POST', '/single_label/generate', labelData, token);
 
   if (statusCode < 200 || statusCode >= 300) {
-    try {
-      const errJson = JSON.parse(buffer.toString());
-      const msg = errJson.message || errJson.error || errJson.msg || `ShippersHub error ${statusCode}`;
-      throw new Error(msg);
-    } catch {
-      throw new Error(`ShippersHub label generation failed (HTTP ${statusCode})`);
+    const rawBody = buffer.toString().slice(0, 1000);
+    console.error(`[ShippersHub] /single_label/generate returned HTTP ${statusCode}:`, rawBody);
+
+    // If token expired/invalid, clear cache so next attempt re-authenticates
+    if (statusCode === 401 || statusCode === 403) {
+      clearToken();
     }
+
+    let msg = `ShippersHub label generation failed (HTTP ${statusCode})`;
+    try {
+      const errJson = JSON.parse(rawBody);
+      msg = errJson.message || errJson.error || errJson.msg
+          || errJson.data?.message || errJson.errors?.[0]?.message
+          || msg;
+    } catch {
+      // Response was not JSON; keep generic message
+    }
+    throw new Error(msg);
   }
 
   const isPdf = contentType.includes('pdf') || buffer.slice(0, 4).toString('ascii') === '%PDF';

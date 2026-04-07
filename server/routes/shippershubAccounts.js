@@ -127,4 +127,23 @@ router.post('/:id/test', async (req, res) => {
   }
 });
 
+// ── GET /api/shippershub-accounts/carriers ───────────────────────────────────
+// Returns carriers + vendors available on the active ShippersHub account.
+// Use this to find the correct shippershubCarrierId / shippershubVendorId
+// values to put in VendorManagement.
+router.get('/carriers', async (req, res) => {
+  try {
+    const carriers = await shippershub.getMyCarriers();
+    const result   = [];
+    for (const c of carriers) {
+      let vendors = [];
+      try { vendors = await shippershub.getMyVendors(c._id || c.id); } catch (_) {}
+      result.push({ ...c, vendors });
+    }
+    res.json({ carriers: result });
+  } catch (err) {
+    res.status(400).json({ message: `Could not fetch carriers: ${err.message}` });
+  }
+});
+
 module.exports = router;

@@ -199,6 +199,7 @@ const Layout: React.FC = () => {
     { name: 'Financial Dashboard', href: '/admin/financial-dashboard', icon: PresentationChartLineIcon, current: location.pathname === '/admin/financial-dashboard' },
     { name: 'Settings',            href: '/admin/settings',            icon: Cog6ToothIcon,               current: location.pathname === '/admin/settings' },
     { name: 'Attendance',          href: '/admin/attendance',          icon: ClockIcon,                   current: location.pathname === '/admin/attendance' },
+    { name: 'Live Monitor',        href: '/admin/live',                icon: SignalIcon,                   current: location.pathname === '/admin/live' },
   ] : user?.role === 'reseller' ? [
     { name: 'My Clients', href: '/reseller/clients', icon: UserGroupIcon, current: location.pathname.startsWith('/reseller/clients') },
     { name: 'Finance',    href: '/reseller/finance', icon: BanknotesIcon, current: location.pathname === '/reseller/finance' },

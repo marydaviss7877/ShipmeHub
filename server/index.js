@@ -173,9 +173,10 @@ io.use(async (socket, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     // Lazy-load User model to avoid circular dependency issues at startup
     const User = require('./models/User');
-    const user = await User.findById(decoded.id).select('_id isActive');
+    const user = await User.findById(decoded.id).select('_id isActive role');
     if (!user || !user.isActive) return next(new Error('User not found or inactive'));
-    socket.userId = user._id.toString();
+    socket.userId   = user._id.toString();
+    socket.userRole = user.role;
     next();
   } catch {
     next(new Error('Invalid or expired token'));
@@ -185,6 +186,11 @@ io.use(async (socket, next) => {
 io.on('connection', (socket) => {
   // Auto-join the user's own private room — no client-controlled room joining
   socket.join(socket.userId);
+
+  // Admins also join the shared admin-room for platform-wide real-time events
+  if (socket.userRole === 'admin') {
+    socket.join('admin-room');
+  }
 
   socket.on('disconnect', () => {
     // No-op — socket.io cleans up room membership automatically

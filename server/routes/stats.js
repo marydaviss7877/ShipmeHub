@@ -6,6 +6,7 @@ const Label       = require('../models/Label');
 const ManifestJob = require('../models/ManifestJob');
 const Vendor      = require('../models/Vendor');
 const Balance     = require('../models/Balance');
+const { getUspsZone1Rate } = require('../utils/uspsRates');
 
 const router = express.Router();
 
@@ -195,6 +196,7 @@ async function userStats(userId) {
     balance,
     recentLabels,
     activeManifests,
+    uspsLabels,
   ] = await Promise.all([
     Label.aggregate([
       { $match: { user: uid } },
@@ -212,6 +214,9 @@ async function userStats(userId) {
       .sort({ createdAt: -1 })
       .limit(4)
       .select('carrier status userBilling assignedVendor createdAt'),
+    // USPS non-manifested generated labels for savings calculation
+    Label.find({ user: uid, carrier: 'USPS', isBulk: false, status: 'generated' })
+      .select('weight price').lean(),
   ]);
 
   const labels = { total: 0, generated: 0, failed: 0, spent: 0, byCarrier: {} };
@@ -237,6 +242,16 @@ async function userStats(userId) {
   const deposited = txns.filter(t => t.type === 'topup').reduce((s, t) => s + t.amount, 0);
   const spent     = txns.filter(t => t.type === 'deduction').reduce((s, t) => s + t.amount, 0);
 
+  // Savings vs USPS retail Zone 1 rates
+  let totalSavings   = 0;
+  let savingsLabels  = 0;
+  for (const lbl of uspsLabels) {
+    const retail = getUspsZone1Rate(lbl.weight);
+    if (retail === null) continue;
+    const saving = retail - (lbl.price || 0);
+    if (saving > 0) { totalSavings += saving; savingsLabels++; }
+  }
+
   return {
     balance: {
       currentBalance: balance.currentBalance,
@@ -245,10 +260,85 @@ async function userStats(userId) {
     },
     labels,
     manifests,
+    savings: { total: totalSavings, labelCount: savingsLabels },
     recentLabels,
     activeManifests,
   };
 }
+
+// ── GET /api/stats/admin-live  (admin only) ──────────────────────────────────
+// Real-time platform snapshot for the admin live monitor page.
+router.get('/admin-live', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') return res.status(403).json({ message: 'Forbidden' });
+
+    const now          = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfHour  = new Date(now); startOfHour.setMinutes(0, 0, 0);
+
+    const [
+      labelsToday,
+      labelsAllTime,
+      labelsThisHour,
+      carrierGroups,
+      stateGroups,
+      activeUsers,
+      totalUsers,
+      pendingManifests,
+      completedManifests,
+      revenueAgg,
+      recentLabels,
+    ] = await Promise.all([
+      Label.countDocuments({ createdAt: { $gte: startOfToday }, status: 'generated' }),
+      Label.countDocuments({ status: 'generated' }),
+      Label.countDocuments({ createdAt: { $gte: startOfHour }, status: 'generated' }),
+      Label.aggregate([
+        { $match: { status: 'generated' } },
+        { $group: { _id: '$carrier', count: { $sum: 1 }, revenue: { $sum: '$price' } } },
+      ]),
+      Label.aggregate([
+        { $match: { status: 'generated', to_state: { $nin: ['', null] } } },
+        { $group: { _id: '$to_state', count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: 30 },
+      ]),
+      User.countDocuments({ isActive: true, role: { $ne: 'admin' } }),
+      User.countDocuments({ role: { $ne: 'admin' } }),
+      ManifestJob.countDocuments({ status: { $in: ['open', 'uploaded', 'under_review'] } }),
+      ManifestJob.countDocuments({ status: 'completed' }),
+      Label.aggregate([{ $group: { _id: null, total: { $sum: '$price' } } }]),
+      Label.find({ status: 'generated' })
+        .sort({ createdAt: -1 })
+        .limit(20)
+        .populate('user', 'firstName lastName')
+        .select('carrier trackingId price to_state to_city createdAt user'),
+    ]);
+
+    const labelsByCarrier = {};
+    for (const g of carrierGroups) labelsByCarrier[g._id || 'Other'] = { count: g.count, revenue: g.revenue || 0 };
+
+    const minutesElapsed = now.getMinutes() || 1;
+
+    res.json({
+      labelsToday,
+      labelsAllTime,
+      labelsThisHour,
+      perMinuteEst:      (labelsThisHour / minutesElapsed).toFixed(1),
+      activeUsers,
+      totalUsers,
+      pendingManifests,
+      completedManifests,
+      totalRevenue:      revenueAgg[0]?.total || 0,
+      labelsByCarrier,
+      labelsByState:     stateGroups.map(s => ({ state: s._id, count: s.count })),
+      recentLabels,
+      fetchedAt:         now.toISOString(),
+    });
+  } catch (err) {
+    console.error('Admin live stats error:', err);
+    res.status(500).json({ message: 'Error fetching admin live stats' });
+  }
+});
 
 // ── GET /api/stats/label-chart  (admin only) ─────────────────────────────────
 // Query params:

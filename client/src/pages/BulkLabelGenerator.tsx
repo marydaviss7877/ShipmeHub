@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import uspsLogo  from '../Logos/United_States_Postal_Service-Logo.wine.png';
@@ -9,8 +9,9 @@ import {
   TruckIcon, ArrowDownTrayIcon, ArrowUpTrayIcon, CheckCircleIcon,
   ExclamationCircleIcon, DocumentTextIcon, XMarkIcon, ClockIcon,
   ClipboardDocumentListIcon, PlusIcon, TrashIcon,
-  ArrowLeftIcon,
+  ArrowLeftIcon, SparklesIcon,
 } from '@heroicons/react/24/outline';
+import { getUspsZone1Rate } from '../utils/uspsRates';
 
 // ── Types ─────────────────────────────────────────────────────
 interface AccessItem {
@@ -207,6 +208,19 @@ const BulkLabelGenerator: React.FC = () => {
   const hasRateTiers = !!selectedVendor?.rateTiers?.length;
   const carrier    = CARRIERS.find(c => c.name === selectedCarrier);
 
+  // Total savings vs USPS retail (Zone 1) — only for USPS non-manifest
+  const totalSavings = useMemo(() => {
+    if (selectedCarrier !== 'USPS' || selectedVendor?.vendorType === 'manifest') return 0;
+    return rows.reduce((sum, r) => {
+      const w = parseFloat(r.weight) || 0;
+      if (w <= 0) return sum;
+      const retail = getUspsZone1Rate(w);
+      if (retail === null) return sum;
+      const saving = retail - getEffectiveRate(w);
+      return sum + (saving > 0 ? saving : 0);
+    }, 0);
+  }, [rows, selectedCarrier, selectedVendor, getEffectiveRate]);
+
   // ── Row editing ──────────────────────────────────────────────
   const revalidateRows = useCallback((newRows: LabelRow[]) => {
     const errors: Record<number, string[]> = {};
@@ -284,7 +298,12 @@ const BulkLabelGenerator: React.FC = () => {
         setApiResult(res.data as ApiResult);
       }
     } catch (err: any) {
-      setGenError(err.response?.data?.message || 'Failed to generate labels');
+      const data = err.response?.data;
+      if (data?.errors?.length) {
+        setGenError(data.errors.map((e: any) => e.msg).join(' · '));
+      } else {
+        setGenError(data?.message || 'Failed to generate labels');
+      }
     } finally {
       setIsGenerating(false);
     }
@@ -365,18 +384,35 @@ const BulkLabelGenerator: React.FC = () => {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
-        {[
+      {(() => {
+        const successSavings = selectedCarrier === 'USPS' && selectedVendor?.vendorType !== 'manifest'
+          ? apiResult.results.reduce((sum, r, i) => {
+              if (!r.success) return sum;
+              const w = parseFloat(rows[i]?.weight) || 0;
+              const retail = getUspsZone1Rate(w);
+              if (!retail) return sum;
+              const saving = retail - getEffectiveRate(w);
+              return sum + (saving > 0 ? saving : 0);
+            }, 0)
+          : 0;
+        const cards = [
           { val: apiResult.results.filter(r => r.success).length,  label: 'Generated', color: 'var(--success-600)' },
           { val: apiResult.results.filter(r => !r.success).length, label: 'Failed',    color: apiResult.results.filter(r => !r.success).length > 0 ? 'var(--danger-600)' : 'var(--navy-400)' },
           { val: `$${apiResult.newBalance.toFixed(2)}`,            label: 'Remaining', color: 'var(--accent-600)' },
-        ].map(({ val, label, color }) => (
-          <div key={label} className="sh-card" style={{ padding: '1.25rem', textAlign: 'center' }}>
-            <div style={{ fontSize: '2rem', fontWeight: 800, color }}>{val}</div>
-            <div style={{ fontSize: '0.8rem', color: 'var(--navy-500)', marginTop: 4 }}>{label}</div>
+          ...(successSavings > 0 ? [{ val: `$${successSavings.toFixed(2)}`, label: 'Saved vs USPS', color: '#059669' }] : []),
+        ];
+        return (
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cards.length}, 1fr)`, gap: '1rem' }}>
+            {cards.map(({ val, label, color }) => (
+              <div key={label} className="sh-card" style={{ padding: '1.25rem', textAlign: 'center' }}>
+                {label === 'Saved vs USPS' && <SparklesIcon style={{ width: 18, height: 18, color: '#059669', margin: '0 auto 4px' }} />}
+                <div style={{ fontSize: '2rem', fontWeight: 800, color }}>{val}</div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--navy-500)', marginTop: 4 }}>{label}</div>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        );
+      })()}
 
       <div className="sh-card">
         <div style={{ overflowX: 'auto' }}>
@@ -726,6 +762,21 @@ const BulkLabelGenerator: React.FC = () => {
               <span style={{ color: 'var(--navy-300)' }}>=</span>
               <span style={{ fontSize: '1rem', fontWeight: 900, color: 'var(--accent-600)' }}>${totalCost.toFixed(2)}</span>
             </div>
+            {totalSavings > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <span style={{ color: 'var(--navy-300)', fontSize: '0.8rem' }}>·</span>
+                <span style={{
+                  display: 'flex', alignItems: 'center', gap: 4,
+                  background: '#ecfdf5', color: '#065f46',
+                  border: '1px solid #6ee7b7',
+                  padding: '2px 10px', borderRadius: 20,
+                  fontSize: '0.78rem', fontWeight: 700,
+                }}>
+                  <SparklesIcon style={{ width: 11, height: 11 }} />
+                  Save ${totalSavings.toFixed(2)} vs USPS retail
+                </span>
+              </div>
+            )}
             {validRowCount !== rows.length && (
               <span className="badge badge-amber"><ExclamationCircleIcon style={{ width: 10, height: 10 }} />{Object.keys(rowErrors).length} row error{Object.keys(rowErrors).length !== 1 ? 's' : ''}</span>
             )}

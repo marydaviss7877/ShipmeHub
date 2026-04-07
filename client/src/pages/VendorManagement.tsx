@@ -233,6 +233,9 @@ const VendorManagement: React.FC = () => {
   const [apiRate,       setApiRate]       = useState('');
   const [apiActive,     setApiActive]     = useState(true);
   const [apiSaving,     setApiSaving]     = useState(false);
+  const [diagLoading,   setDiagLoading]   = useState(false);
+  const [diagData,      setDiagData]      = useState<any[] | null>(null);
+  const [diagError,     setDiagError]     = useState('');
 
   // Manifest vendors
   const [vendors,       setVendors]       = useState<ManifestVendor[]>([]);
@@ -298,6 +301,16 @@ const VendorManagement: React.FC = () => {
       notify('Vendor deleted');
       fetchApiVendors();
     } catch (err: any) { notify(err.response?.data?.message || 'Delete failed', true); }
+  };
+
+  const handleDiagnose = async () => {
+    setDiagLoading(true); setDiagData(null); setDiagError('');
+    try {
+      const res = await axios.get('/shippershub-accounts/carriers');
+      setDiagData(res.data.carriers || []);
+    } catch (err: any) {
+      setDiagError(err.response?.data?.message || 'Could not connect to ShippersHub');
+    } finally { setDiagLoading(false); }
   };
 
   const fetchVendors = async () => {
@@ -416,12 +429,21 @@ const VendorManagement: React.FC = () => {
           </button>
         )}
         {activeTab === 'api' && (
-          <button className="btn btn-primary" onClick={handleImportShippersHub} disabled={importing}>
-            {importing
-              ? <><div className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }} /> Syncing…</>
-              : <><CloudArrowDownIcon style={{ width: 16, height: 16 }} /> Sync from ShippersHub</>
-            }
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-ghost" onClick={handleDiagnose} disabled={diagLoading}
+              title="Fetch live carriers and vendor IDs from your ShippersHub account">
+              {diagLoading
+                ? <><div className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }} /> Checking…</>
+                : <><MagnifyingGlassIcon style={{ width: 16, height: 16 }} /> Check Connection</>
+              }
+            </button>
+            <button className="btn btn-primary" onClick={handleImportShippersHub} disabled={importing}>
+              {importing
+                ? <><div className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }} /> Syncing…</>
+                : <><CloudArrowDownIcon style={{ width: 16, height: 16 }} /> Sync from ShippersHub</>
+              }
+            </button>
+          </div>
         )}
       </div>
 
@@ -457,6 +479,44 @@ const VendorManagement: React.FC = () => {
       {/* ── API Vendors Tab ──────────────────────────────────── */}
       {activeTab === 'api' && (
         <>
+          {/* Diagnostics panel */}
+          {(diagData !== null || diagError) && (
+            <div className="sh-card" style={{ padding: '1rem 1.25rem', border: diagError ? '1.5px solid #fca5a5' : '1.5px solid #bbf7d0', background: diagError ? '#fff5f5' : '#f0fdf4' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <span style={{ fontWeight: 700, fontSize: '0.82rem', color: diagError ? '#b91c1c' : '#15803d' }}>
+                  {diagError ? '✗ Connection failed' : `✓ ShippersHub connected — ${diagData!.length} carrier(s) found`}
+                </span>
+                <button onClick={() => { setDiagData(null); setDiagError(''); }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--navy-400)', padding: 2 }}>
+                  <XMarkIcon style={{ width: 14, height: 14 }} />
+                </button>
+              </div>
+              {diagError && <p style={{ fontSize: '0.82rem', color: '#b91c1c', margin: 0 }}>{diagError}</p>}
+              {diagData && diagData.map((carrier: any) => (
+                <div key={carrier._id || carrier.id} style={{ marginBottom: 10 }}>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--navy-700)', marginBottom: 4 }}>
+                    {carrier.name} — Carrier ID: <code style={{ background: '#e0f2fe', padding: '1px 5px', borderRadius: 3, fontSize: '0.75rem' }}>{carrier._id || carrier.id || '?'}</code>
+                  </div>
+                  {(carrier.vendors || []).length === 0
+                    ? <div style={{ fontSize: '0.72rem', color: 'var(--navy-400)' }}>No vendors found for this carrier</div>
+                    : (carrier.vendors || []).map((v: any) => (
+                        <div key={v._id || v.id} style={{ fontSize: '0.72rem', color: 'var(--navy-600)', display: 'flex', gap: 8, marginBottom: 2 }}>
+                          <span style={{ fontWeight: 600 }}>{v.name}</span>
+                          <span>Vendor ID: <code style={{ background: '#e0f2fe', padding: '1px 4px', borderRadius: 3 }}>{v._id || v.id || '?'}</code></span>
+                          <span style={{ color: 'var(--navy-400)' }}>{v.status || ''}</span>
+                        </div>
+                      ))
+                  }
+                </div>
+              ))}
+              {diagData && diagData.length > 0 && (
+                <p style={{ fontSize: '0.72rem', color: 'var(--navy-500)', marginTop: 8, marginBottom: 0 }}>
+                  If the IDs above don't match what's stored in your vendors, click <strong>Sync from ShippersHub</strong> to re-import.
+                </p>
+              )}
+            </div>
+          )}
+
           <div className="sh-card">
             {apiLoading ? (
               <div style={{ display: 'flex', justifyContent: 'center', padding: '4rem' }}><div className="spinner" /></div>
@@ -483,8 +543,21 @@ const VendorManagement: React.FC = () => {
                     {apiVendors.map(v => (
                       <tr key={v._id}>
                         <td>
-                          <div style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--navy-900)' }}>{v.name}</div>
-                          <div style={{ fontSize: '0.68rem', color: 'var(--navy-400)' }}>ID: {v.shippershubVendorId || '—'}</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--navy-900)' }}>{v.name}</span>
+                            {(!v.shippershubCarrierId || !v.shippershubVendorId) && (
+                              <span title="Missing ShippersHub carrier or vendor ID — label generation will fail. Re-sync to fix."
+                                style={{ background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a', borderRadius: 4, padding: '1px 5px', fontSize: '0.65rem', fontWeight: 700, cursor: 'help' }}>
+                                ⚠ IDs missing
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: '0.68rem', color: 'var(--navy-400)', marginTop: 2 }}>
+                            Carrier ID: {v.shippershubCarrierId || <span style={{ color: '#dc2626' }}>not set</span>}
+                          </div>
+                          <div style={{ fontSize: '0.68rem', color: 'var(--navy-400)' }}>
+                            Vendor ID: {v.shippershubVendorId || <span style={{ color: '#dc2626' }}>not set</span>}
+                          </div>
                         </td>
                         <td>
                           {(() => {

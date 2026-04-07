@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import {
   TruckIcon, CheckCircleIcon, ExclamationCircleIcon,
   ArrowDownTrayIcon, XMarkIcon, ArrowsRightLeftIcon,
-  BuildingOfficeIcon, PlusIcon, TrashIcon, ChevronDownIcon,
+  BuildingOfficeIcon, PlusIcon, TrashIcon, ChevronDownIcon, SparklesIcon,
 } from '@heroicons/react/24/outline';
+import { getUspsZone1Rate } from '../utils/uspsRates';
 import uspsLogo  from '../Logos/United_States_Postal_Service-Logo.wine.png';
 import upsLogo   from '../Logos/United_Parcel_Service-Logo.wine.png';
 import fedexLogo from '../Logos/FedEx_Express-Logo.wine.png';
@@ -185,6 +186,15 @@ const LabelGenerator: React.FC = () => {
 
   const effectiveRate = getEffectiveRate(weight);
   const canSubmit     = !!selectedVendorId && !isLoading;
+
+  // Savings vs USPS retail (Zone 1) — only when USPS selected and weight known
+  const uspsSaving = useMemo(() => {
+    if (selectedCarrier !== 'USPS' || weight <= 0) return null;
+    const retail = getUspsZone1Rate(weight);
+    if (retail === null) return null;
+    const saving = retail - effectiveRate;
+    return saving > 0 ? { retail, saving } : null;
+  }, [selectedCarrier, weight, effectiveRate]);
   const activeCfg     = selectedCarrier ? CARRIER_CFG[selectedCarrier] : null;
 
   // Swap FROM ↔ TO
@@ -259,7 +269,13 @@ const LabelGenerator: React.FC = () => {
         balance:  (res.data.newBalance ?? 0).toFixed(2),
       });
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to generate label');
+      const data = err.response?.data;
+      if (data?.errors?.length) {
+        // Show each validation field error so the user knows exactly what to fix
+        setError(data.errors.map((e: any) => e.msg).join(' · '));
+      } else {
+        setError(data?.message || 'Failed to generate label');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -360,16 +376,28 @@ const LabelGenerator: React.FC = () => {
               ))}
             </select>
 
-            {/* Price chip */}
-            {selectedAccess && (
+            {/* Price chip — only show once weight is entered */}
+            {selectedAccess && weight > 0 && (
               <span style={{
-                background: weight > 0 ? '#dcfce7' : 'var(--navy-100)',
-                color:      weight > 0 ? '#15803d' : 'var(--navy-500)',
-                border:     `1px solid ${weight > 0 ? '#bbf7d0' : 'var(--navy-200)'}`,
+                background: '#dcfce7', color: '#15803d', border: '1px solid #bbf7d0',
                 padding: '2px 9px', borderRadius: 20,
                 fontSize: '0.75rem', fontWeight: 700, transition: 'all 0.2s', flexShrink: 0,
               }}>
-                {weight > 0 ? `$${effectiveRate.toFixed(2)}` : `base $${selectedAccess.baseRate.toFixed(2)}`}
+                ${effectiveRate.toFixed(2)}
+              </span>
+            )}
+
+            {/* USPS savings chip */}
+            {uspsSaving && (
+              <span style={{
+                display: 'flex', alignItems: 'center', gap: 4,
+                background: '#ecfdf5', color: '#065f46',
+                border: '1px solid #6ee7b7',
+                padding: '2px 9px', borderRadius: 20,
+                fontSize: '0.75rem', fontWeight: 700, flexShrink: 0,
+              }}>
+                <SparklesIcon style={{ width: 11, height: 11 }} />
+                Save ${uspsSaving.saving.toFixed(2)} vs USPS retail
               </span>
             )}
 
@@ -632,7 +660,11 @@ const LabelGenerator: React.FC = () => {
                 : <CheckCircleIcon       style={{ width: 14, height: 14, color: '#16a34a', flexShrink: 0 }} />
               }
               <span style={{ fontSize: '0.78rem', color: error ? '#dc2626' : '#15803d', flex: 1 }}>
-                {error || (successData && `Label generated · Tracking: ${successData.tracking} · Charged: $${successData.charged} · Balance: $${successData.balance}`)}
+                {error || (successData && (() => {
+                const retail = selectedCarrier === 'USPS' && weight > 0 ? getUspsZone1Rate(weight) : null;
+                const saving = retail ? Math.max(0, retail - parseFloat(successData.charged)) : 0;
+                return `Label generated · Tracking: ${successData.tracking} · Charged: $${successData.charged} · Balance: $${successData.balance}${saving > 0 ? ` · Saved $${saving.toFixed(2)} vs USPS retail` : ''}`;
+              })())}
               </span>
               <button
                 type="button"

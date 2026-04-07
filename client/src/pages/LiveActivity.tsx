@@ -1,625 +1,391 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import * as d3 from 'd3';
+import * as topojson from 'topojson-client';
 
-// ── City data — approximate % positions on the map container ──
-const CITIES = [
-  { name: 'New York',      x: 83, y: 27, region: 'Northeast'  },
-  { name: 'Los Angeles',   x: 11, y: 53, region: 'West Coast' },
-  { name: 'Chicago',       x: 63, y: 26, region: 'Midwest'    },
-  { name: 'Houston',       x: 47, y: 64, region: 'South'      },
-  { name: 'Phoenix',       x: 22, y: 55, region: 'Southwest'  },
-  { name: 'Philadelphia',  x: 81, y: 30, region: 'Northeast'  },
-  { name: 'Dallas',        x: 50, y: 60, region: 'South'      },
-  { name: 'San Jose',      x: 8,  y: 43, region: 'West Coast' },
-  { name: 'Austin',        x: 47, y: 66, region: 'South'      },
-  { name: 'Jacksonville',  x: 74, y: 58, region: 'Southeast'  },
-  { name: 'Columbus',      x: 70, y: 32, region: 'Midwest'    },
-  { name: 'Charlotte',     x: 74, y: 44, region: 'Southeast'  },
-  { name: 'Indianapolis',  x: 67, y: 33, region: 'Midwest'    },
-  { name: 'San Francisco', x: 7,  y: 41, region: 'West Coast' },
-  { name: 'Seattle',       x: 10, y: 15, region: 'Pacific NW' },
-  { name: 'Denver',        x: 33, y: 38, region: 'Mountain'   },
-  { name: 'Nashville',     x: 67, y: 46, region: 'Southeast'  },
-  { name: 'Miami',         x: 77, y: 70, region: 'Southeast'  },
-  { name: 'Atlanta',       x: 71, y: 52, region: 'Southeast'  },
-  { name: 'Minneapolis',   x: 54, y: 19, region: 'Midwest'    },
-  { name: 'Boston',        x: 87, y: 23, region: 'Northeast'  },
-  { name: 'Portland',      x: 9,  y: 17, region: 'Pacific NW' },
-  { name: 'Detroit',       x: 70, y: 25, region: 'Midwest'    },
-  { name: 'Las Vegas',     x: 19, y: 49, region: 'Southwest'  },
-  { name: 'Memphis',       x: 63, y: 50, region: 'South'      },
-  { name: 'Baltimore',     x: 81, y: 32, region: 'Northeast'  },
-  { name: 'Kansas City',   x: 55, y: 40, region: 'Midwest'    },
-  { name: 'New Orleans',   x: 62, y: 67, region: 'South'      },
-  { name: 'Albuquerque',   x: 30, y: 53, region: 'Southwest'  },
-  { name: 'Salt Lake City',x: 24, y: 36, region: 'Mountain'   },
-];
-
-const CARRIER_CFG: Record<string, { color: string; glow: string; pct: number }> = {
-  USPS:  { color: '#3b82f6', glow: 'rgba(59,130,246,0.5)',   pct: 52 },
-  UPS:   { color: '#f59e0b', glow: 'rgba(245,158,11,0.5)',   pct: 22 },
-  FedEx: { color: '#a855f7', glow: 'rgba(168,85,247,0.5)',   pct: 17 },
-  DHL:   { color: '#ef4444', glow: 'rgba(239,68,68,0.5)',    pct: 9  },
+// ── State density data ─────────────────────────────────────────
+const STATE_DATA: Record<string, number> = {
+  'California':8210,'Texas':6140,'Florida':5380,'New York':4820,
+  'Illinois':3190,'Pennsylvania':2870,'Ohio':2430,'Georgia':2210,
+  'Washington':2080,'Arizona':1940,'North Carolina':1820,'Michigan':1760,
+  'New Jersey':1710,'Virginia':1590,'Colorado':1480,'Tennessee':1360,
+  'Indiana':1240,'Nevada':1180,'Minnesota':1120,'Massachusetts':1090,
+  'Missouri':1020,'Wisconsin':980,'Oregon':940,'Maryland':920,
+  'Connecticut':870,'Alabama':820,'South Carolina':790,'Utah':760,
+  'Oklahoma':710,'Kansas':680,'Iowa':650,'Kentucky':630,
+  'Arkansas':590,'Nebraska':540,'New Mexico':510,
+  'West Virginia':480,'Idaho':440,'Hawaii':420,'Maine':400,
+  'New Hampshire':390,'Rhode Island':370,'Montana':350,'Delaware':330,
+  'South Dakota':310,'North Dakota':290,'Alaska':270,'Vermont':250,
+  'Wyoming':230,'Mississippi':540,
 };
-const CARRIERS = ['USPS', 'UPS', 'FedEx', 'DHL'] as const;
 
+const TOP_STATES = Object.entries(STATE_DATA).sort((a, b) => b[1] - a[1]).slice(0, 10);
+const MAX_VAL    = TOP_STATES[0][1];
 
-// ── Seeded random (deterministic on first render, changes per session) ──
-const rand = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
-const pick = <T,>(arr: readonly T[]) => arr[Math.floor(Math.random() * arr.length)] as T;
-const fmt  = (n: number) => n.toLocaleString();
+// Amber gradient — low → high
+const AMBER_STOPS = ['#FEF3C7','#FDE68A','#FCD34D','#FBBF24','#F59E0B','#D97706','#B45309'];
 
-function buildBase() {
-  const today     = rand(1200, 2200);
-  const thisHour  = rand(60,   180);
-  const yesterday = rand(1600, 3200);
-  const week      = rand(11000, 19000);
-  // per-carrier totals for today
-  const perCarrier: Record<string, number> = {};
-  CARRIERS.forEach(c => { perCarrier[c] = Math.round(today * CARRIER_CFG[c].pct / 100); });
-  // 7-day bar chart values
-  const days7: number[] = [];
-  for (let i = 6; i >= 0; i--) {
-    days7.push(i === 0 ? today : rand(900, 3000));
-  }
-  return { today, thisHour, yesterday, week, perCarrier, days7 };
-}
-
-interface FeedItem {
-  id: number;
-  carrier: string;
-  count: number;
-  region: string;
-  city: string;
-  age: number; // seconds since created
-}
-
-// ── Animated counter ──────────────────────────────────────────
-function useCounter(target: number) {
-  const [val, setVal] = useState(target);
-  const prev = useRef(target);
-  useEffect(() => {
-    const from = prev.current;
-    const diff = target - from;
-    if (!diff) return;
-    const start = performance.now();
-    const dur   = 900;
-    let raf: number;
-    const step = (now: number) => {
-      const p = Math.min((now - start) / dur, 1);
-      const e = 1 - Math.pow(1 - p, 3);
-      setVal(Math.round(from + diff * e));
-      if (p < 1) raf = requestAnimationFrame(step);
-      else prev.current = target;
-    };
-    raf = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(raf);
-  }, [target]);
-  return val;
-}
-
-// ── Stat card ─────────────────────────────────────────────────
-const StatCard = ({
-  label, value, sub, flash, accent,
-}: { label: string; value: number; sub?: string; flash: boolean; accent: string }) => {
-  const displayed = useCounter(value);
-  return (
-    <div style={{
-      background: '#fff',
-      border: `1.5px solid ${flash ? accent : 'var(--navy-100)'}`,
-      borderRadius: 14, padding: '1.1rem 1.25rem',
-      transition: 'border-color 0.4s',
-      boxShadow: flash ? `0 0 0 3px ${accent}22` : '0 1px 3px rgba(0,0,0,0.06)',
-      position: 'relative', overflow: 'hidden',
-    }}>
-      {flash && (
-        <div style={{
-          position: 'absolute', inset: 0, background: `${accent}0d`,
-          animation: 'la-flash 0.8s ease-out forwards',
-          pointerEvents: 'none',
-        }} />
-      )}
-      <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--navy-400)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>
-        {label}
-      </div>
-      <div style={{ fontSize: '1.9rem', fontWeight: 900, color: 'var(--navy-900)', letterSpacing: '-0.03em', lineHeight: 1 }}>
-        {fmt(displayed)}
-      </div>
-      {sub && <div style={{ fontSize: '0.7rem', color: 'var(--navy-400)', marginTop: 5 }}>{sub}</div>}
-    </div>
-  );
-};
+function fmt(n: number) { return Math.round(n).toLocaleString(); }
 
 // ── Main component ─────────────────────────────────────────────
-let feedIdCounter = 100;
-
 const LiveActivity: React.FC = () => {
-  const [base,       setBase]       = useState(buildBase);
-  const [flash,      setFlash]      = useState<Record<string, boolean>>({});
-  const [feed,       setFeed]       = useState<FeedItem[]>([]);
-  const [activeDots, setActiveDots] = useState<Set<number>>(() => {
-    const s = new Set<number>();
-    for (let i = 0; i < 18; i++) s.add(rand(0, CITIES.length - 1));
-    return s;
-  });
-  const [lastUpdate, setLastUpdate] = useState(Date.now());
-  const [secAgo,     setSecAgo]     = useState(0);
-  const feedRef = useRef<HTMLDivElement>(null);
+  const [clock,            setClock]           = useState('--:--:--');
+  const [dateStr,          setDateStr]         = useState('');
+  const [minElapsed,       setMinElapsed]      = useState(0);
+  const [hourProgress,     setHourProgress]    = useState(0);
 
-  // Tick: update feed item ages every second
+  const [labelsToday,      setLabelsToday]     = useState(47832);
+  const [labelsDelta,      setLabelsDelta]     = useState(2341);
+  const [labelsAllTime,    setLabelsAllTime]   = useState(3241091);
+  const [moneySaved,       setMoneySaved]      = useState(2341490);
+  const [hourTicker,       setHourTicker]      = useState(2847);
+  const [perMin,           setPerMin]          = useState('47.4');
+  const [queued,           setQueued]          = useState(14);
+  const [showSavingsTip,   setShowSavingsTip]  = useState(false);
+
+  const mapRef     = useRef<HTMLDivElement>(null);
+  const svgRef     = useRef<SVGSVGElement | null>(null);
+  const mapReady   = useRef(false);
+
+  // ── Clock ────────────────────────────────────────────────────
+  useEffect(() => {
+    function tick() {
+      const now = new Date();
+      setClock(
+        `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`
+      );
+      const m = now.getMinutes();
+      setMinElapsed(m);
+      setHourProgress(Math.round((m / 60) * 100));
+      setDateStr(now.toLocaleDateString('en-US', { weekday:'long', month:'short', day:'numeric', year:'numeric' }));
+    }
+    tick();
+    const iv = setInterval(tick, 1000);
+    return () => clearInterval(iv);
+  }, []);
+
+  // ── Label ticker ─────────────────────────────────────────────
   useEffect(() => {
     const iv = setInterval(() => {
-      setSecAgo(Math.floor((Date.now() - lastUpdate) / 1000));
-      setFeed(prev => prev.map(f => ({ ...f, age: f.age + 1 })));
-    }, 1000);
-    return () => clearInterval(iv);
-  }, [lastUpdate]);
-
-  // Main update: every 30–55 seconds
-  const doUpdate = useCallback(() => {
-    const carrier  = pick(CARRIERS);
-    const cityIdx  = rand(0, CITIES.length - 1);
-    const city     = CITIES[cityIdx];
-    const newCount = rand(8, 45);
-
-    // Increment stats
-    setBase(prev => {
-      const perCarrier = { ...prev.perCarrier };
-      perCarrier[carrier] = (perCarrier[carrier] || 0) + newCount;
-      return {
-        ...prev,
-        today:    prev.today    + newCount,
-        thisHour: prev.thisHour + newCount,
-        week:     prev.week     + newCount,
-        perCarrier,
-      };
-    });
-
-    // Flash the stat cards
-    setFlash({ today: true, thisHour: true, week: true });
-    setTimeout(() => setFlash({}), 1000);
-
-    // Add to feed
-    const item: FeedItem = {
-      id: ++feedIdCounter,
-      carrier,
-      count: newCount,
-      region: city.region,
-      city: city.name,
-      age: 0,
-    };
-    setFeed(prev => [item, ...prev].slice(0, 12));
-
-    // Pulse a new dot on the map
-    setActiveDots(prev => {
-      const next = new Set(prev);
-      next.add(cityIdx);
-      if (next.size > 22) {
-        const first = next.values().next().value;
-        next.delete(first);
-      }
-      return next;
-    });
-
-    setLastUpdate(Date.now());
-    setSecAgo(0);
-  }, []);
-
-  // Schedule next update every 30–55s
-  useEffect(() => {
-    // First update after 4 seconds (immediate feel on load)
-    const first = setTimeout(doUpdate, 4000);
-    let recurse: ReturnType<typeof setTimeout>;
-    const schedule = () => {
-      recurse = setTimeout(() => { doUpdate(); schedule(); }, rand(30000, 55000));
-    };
-    const afterFirst = setTimeout(schedule, 4500);
-    return () => { clearTimeout(first); clearTimeout(afterFirst); clearTimeout(recurse); };
-  }, [doUpdate]);
-
-  // Seed initial feed
-  useEffect(() => {
-    const initial: FeedItem[] = [];
-    for (let i = 0; i < 8; i++) {
-      const carrier = pick(CARRIERS);
-      const city    = pick(CITIES);
-      initial.push({
-        id: ++feedIdCounter,
-        carrier,
-        count: rand(8, 45),
-        region: city.region,
-        city: city.name,
-        age: rand(60, 600),
+      if (Math.random() >= 0.3) return;
+      setLabelsToday(v => v + 1);
+      setLabelsDelta(v => v + 1);
+      setLabelsAllTime(v => v + 1);
+      setHourTicker(prev => {
+        const next = prev + 1;
+        const mins = new Date().getMinutes();
+        setPerMin((next / Math.max(mins, 1)).toFixed(1));
+        return next;
       });
-    }
-    setFeed(initial);
+      setMoneySaved(v => v + 4.7 + Math.random() * 2);
+      setQueued(Math.floor(Math.random() * 22) + 3);
+    }, 2000);
+    return () => clearInterval(iv);
   }, []);
 
-  const ageLabel = (s: number) => {
-    if (s < 5)   return 'just now';
-    if (s < 60)  return `${s}s ago`;
-    if (s < 120) return '1 min ago';
-    return `${Math.floor(s / 60)}m ago`;
+  // ── D3 Choropleth map ────────────────────────────────────────
+  useEffect(() => {
+    if (mapReady.current || !mapRef.current) return;
+    let cancelled = false;
+
+    async function draw() {
+      try {
+        const us = await d3.json<any>('/states-10m.json');
+        if (cancelled || !mapRef.current || !us) return;
+
+        // Clear previous render
+        d3.select(mapRef.current).selectAll('*').remove();
+
+        const W = mapRef.current.offsetWidth || 560;
+        const H = Math.round(W * 0.6);
+
+        const colorScale = d3.scaleQuantize<string>()
+          .domain([0, MAX_VAL])
+          .range(AMBER_STOPS);
+
+        const proj = d3.geoAlbersUsa().scale(W * 1.22).translate([W / 2, H / 2]);
+        const path = d3.geoPath(proj);
+
+        const svg = d3.select(mapRef.current)
+          .append('svg')
+          .attr('viewBox', `0 0 ${W} ${H}`)
+          .attr('width', '100%')
+          .style('display', 'block');
+
+        svgRef.current = svg.node();
+
+        const states = topojson.feature(us, us.objects.states) as any;
+
+        svg.selectAll<SVGPathElement, any>('path')
+          .data(states.features)
+          .join('path')
+          .attr('d', path as any)
+          .attr('fill', (d: any) => {
+            const name = d?.properties?.name as string;
+            const v    = STATE_DATA[name] || 0;
+            return v > 0 ? colorScale(v) : '#E2E8F0';
+          })
+          .attr('stroke', '#fff')
+          .attr('stroke-width', 0.6)
+          .append('title')
+          .text((d: any) => {
+            const name = d?.properties?.name as string;
+            return `${name}: ${(STATE_DATA[name] || 0).toLocaleString()} labels`;
+          });
+
+        mapReady.current = true;
+      } catch (err) {
+        console.error('[LiveActivity] map error:', err);
+        if (!cancelled && mapRef.current) {
+          mapRef.current.innerHTML =
+            '<div style="padding:24px;text-align:center;font-size:12px;color:#94A3B8;">Could not load map data</div>';
+        }
+      }
+    }
+
+    draw();
+    return () => { cancelled = true; };
+  }, []);
+
+  // ── Shared card style ────────────────────────────────────────
+  const card: React.CSSProperties = {
+    background: '#fff',
+    borderRadius: 12,
+    padding: '14px 18px',
+    border: '1.5px solid var(--navy-100)',
+    boxShadow: '0 1px 4px rgba(15,23,42,0.06)',
   };
-
-  const totalToday = Object.values(base.perCarrier).reduce((a, b) => a + b, 0);
-
-  // Day labels for 7-day chart
-  const dayLabels = ['6d', '5d', '4d', '3d', '2d', 'Yest', 'Today'];
-  const maxDay = Math.max(...base.days7);
 
   return (
     <>
       <style>{`
-        @keyframes la-flash    { 0%{opacity:1} 100%{opacity:0} }
-        @keyframes la-pulse    { 0%,100%{transform:scale(1);opacity:.7} 50%{transform:scale(2.4);opacity:0} }
-        @keyframes la-blink    { 0%,100%{opacity:1} 50%{opacity:.25} }
-        @keyframes la-slidein  { from{opacity:0;transform:translateY(-10px)} to{opacity:1;transform:translateY(0)} }
-        @keyframes la-bar      { from{width:0%} to{width:var(--tw)} }
-        @keyframes la-ripple   { 0%{transform:scale(1);opacity:.6} 100%{transform:scale(3.5);opacity:0} }
+        @keyframes la-blink  { 0%,100%{opacity:1} 50%{opacity:0.15} }
+        @keyframes la-fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
       `}</style>
 
-      <div className="animate-fadeIn" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
 
-        {/* ── Header ─────────────────────────────────────────── */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <h1 className="page-title" style={{ margin: 0 }}>Live Shipping Activity</h1>
-            <p className="page-subtitle" style={{ margin: 0 }}>Platform-wide label generation across all carriers</p>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 20, padding: '6px 14px' }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', display: 'inline-block', animation: 'la-blink 1.4s ease-in-out infinite' }} />
-            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#166534' }}>LIVE</span>
-            <span style={{ fontSize: '0.72rem', color: '#4ade80', marginLeft: 2 }}>
-              {secAgo < 5 ? 'just updated' : `updated ${secAgo}s ago`}
+        {/* ── Header ───────────────────────────────────────────── */}
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          paddingBottom: 14, borderBottom: '1px solid var(--navy-100)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+            <span style={{ fontSize: 15, fontWeight: 800, letterSpacing: '0.12em', color: 'var(--navy-900)', textTransform: 'uppercase' }}>
+              ShipmeHub
+            </span>
+            <span style={{ fontSize: 11, color: 'var(--navy-400)', letterSpacing: '0.06em', fontWeight: 500 }}>
+              / Platform Live Metrics
             </span>
           </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{
+                width: 7, height: 7, borderRadius: '50%', background: '#16a34a',
+                animation: 'la-blink 1.4s ease-in-out infinite', flexShrink: 0,
+              }} />
+              <span style={{ fontSize: 10, color: '#16a34a', letterSpacing: '0.1em', fontWeight: 700 }}>LIVE</span>
+            </div>
+            <span style={{ fontSize: 12, color: 'var(--navy-600)', fontVariantNumeric: 'tabular-nums', fontWeight: 500 }}>{clock}</span>
+            <span style={{ fontSize: 12, color: 'var(--navy-400)' }}>{dateStr}</span>
+          </div>
         </div>
 
-        {/* ── Stat cards ──────────────────────────────────────── */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem' }}>
-          <StatCard label="This Hour"    value={base.thisHour}  flash={!!flash.thisHour} accent="#6366f1" sub="labels generated" />
-          <StatCard label="Today"        value={base.today}     flash={!!flash.today}    accent="#22c55e" sub={`${fmt(Math.round(base.today / 24))} avg/hr`} />
-          <StatCard label="Yesterday"    value={base.yesterday} flash={false}            accent="#f59e0b" sub="completed labels" />
-          <StatCard label="Last 7 Days"  value={base.week}      flash={!!flash.week}     accent="#3b82f6" sub={`${fmt(Math.round(base.week / 7))} avg/day`} />
-        </div>
+        {/* ── 4 Metric cards ───────────────────────────────────── */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 10 }}>
 
-        {/* ── Middle row: Map + Breakdown ─────────────────────── */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '0.875rem', alignItems: 'start' }}>
+          {/* Labels Today */}
+          <div style={{ ...card, animation: 'la-fadeUp 0.45s ease both', animationDelay: '0.05s' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--navy-400)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 10 }}>
+              Labels Today
+            </div>
+            <div style={{ fontSize: 30, fontWeight: 800, color: 'var(--navy-900)', lineHeight: 1, letterSpacing: '-0.02em' }}>
+              {fmt(labelsToday)}
+            </div>
+            <div style={{ fontSize: 11, color: '#16a34a', marginTop: 8, display: 'flex', alignItems: 'center', gap: 3 }}>
+              +{fmt(labelsDelta)} <span style={{ color: 'var(--navy-400)', fontWeight: 400 }}>since midnight</span>
+            </div>
+          </div>
 
-          {/* US Activity Map */}
-          <div style={{
-            background: '#0b1120',
-            borderRadius: 16, overflow: 'hidden',
-            border: '1px solid #1e293b',
-            boxShadow: '0 4px 24px rgba(0,0,0,0.3)',
-          }}>
-            {/* Map header */}
-            <div style={{ padding: '0.875rem 1.25rem', borderBottom: '1px solid #1e293b', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                United States · Activity Map
-              </span>
-              <div style={{ display: 'flex', gap: 12 }}>
-                {CARRIERS.map(c => (
-                  <div key={c} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: CARRIER_CFG[c].color, display: 'inline-block' }} />
-                    <span style={{ fontSize: '0.65rem', color: '#475569', fontWeight: 600 }}>{c}</span>
+          {/* All-Time Labels */}
+          <div style={{ ...card, animation: 'la-fadeUp 0.45s ease both', animationDelay: '0.1s' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--navy-400)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 10 }}>
+              All-Time Labels
+            </div>
+            <div style={{ fontSize: 30, fontWeight: 800, color: 'var(--navy-900)', lineHeight: 1, letterSpacing: '-0.02em' }}>
+              {fmt(labelsAllTime)}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--navy-400)', marginTop: 8 }}>Since Jan 2022</div>
+          </div>
+
+          {/* Active Sellers */}
+          <div style={{ ...card, animation: 'la-fadeUp 0.45s ease both', animationDelay: '0.15s' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--navy-400)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 10 }}>
+              Active Sellers
+            </div>
+            <div style={{ fontSize: 30, fontWeight: 800, color: 'var(--navy-900)', lineHeight: 1, letterSpacing: '-0.02em' }}>
+              1,847
+            </div>
+            <div style={{ fontSize: 11, color: '#16a34a', marginTop: 8 }}>+12 this session</div>
+          </div>
+
+          {/* Money Saved */}
+          <div style={{ ...card, animation: 'la-fadeUp 0.45s ease both', animationDelay: '0.2s' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--navy-400)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                Saved vs USPS Retail
+              </div>
+              <div
+                style={{ position: 'relative', lineHeight: 1, cursor: 'help' }}
+                onMouseEnter={() => setShowSavingsTip(true)}
+                onMouseLeave={() => setShowSavingsTip(false)}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" style={{ width: 14, height: 14, color: '#94a3b8' }}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
+                </svg>
+                {showSavingsTip && (
+                  <div style={{
+                    position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 100,
+                    background: '#1e293b', color: '#f1f5f9',
+                    borderRadius: 8, padding: '9px 12px',
+                    fontSize: 11, lineHeight: 1.55, fontWeight: 400,
+                    width: 250, boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+                    pointerEvents: 'none',
+                  }}>
+                    This figure compares label costs against standard USPS retail rates. Actual savings may differ if prior negotiated rates were in place. Think of this as an estimated benchmark — not a guaranteed fixed saving.
                   </div>
-                ))}
+                )}
               </div>
             </div>
+            <div style={{ fontSize: 30, fontWeight: 800, color: '#16a34a', lineHeight: 1, letterSpacing: '-0.02em' }}>
+              ${fmt(moneySaved)}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--navy-400)', marginTop: 8 }}>All-time total</div>
+          </div>
 
-            {/* Map body */}
-            <div style={{ position: 'relative', height: 310, overflow: 'hidden' }}>
+        </div>
 
-              {/* ── SVG US outline ─────────────────────────────── */}
-              <svg
-                viewBox="0 0 100 100"
-                preserveAspectRatio="none"
-                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
-                aria-hidden="true"
-              >
-                {/* Ocean */}
-                <rect width="100" height="100" fill="#06101e" />
-                {/* US landmass fill */}
-                <path
-                  d="M7,10 L57,6 L58,9 L63,9 L67,12 L72,10 L79,13 L85,16 L88,21 L85,26 L82,31 L80,37 L77,44 L75,53 L75,58 L77,63 L79,73 L77,79 L73,73 L68,69 L60,68 L55,71 L50,68 L42,66 L28,66 L21,63 L17,58 L12,57 L7,56 L5,53 L5,47 L6,38 L5,28 L6,18 L7,13 Z"
-                  fill="#0d1f35"
-                />
-                {/* US border / coastline */}
-                <path
-                  d="M7,10 L57,6 L58,9 L63,9 L67,12 L72,10 L79,13 L85,16 L88,21 L85,26 L82,31 L80,37 L77,44 L75,53 L75,58 L77,63 L79,73 L77,79 L73,73 L68,69 L60,68 L55,71 L50,68 L42,66 L28,66 L21,63 L17,58 L12,57 L7,56 L5,53 L5,47 L6,38 L5,28 L6,18 L7,13 Z"
-                  fill="none"
-                  stroke="#2a6090"
-                  strokeWidth="0.5"
-                  strokeLinejoin="round"
-                />
-                {/* Interior glow along the coast */}
-                <path
-                  d="M7,10 L57,6 L58,9 L63,9 L67,12 L72,10 L79,13 L85,16 L88,21 L85,26 L82,31 L80,37 L77,44 L75,53 L75,58 L77,63 L79,73 L77,79 L73,73 L68,69 L60,68 L55,71 L50,68 L42,66 L28,66 L21,63 L17,58 L12,57 L7,56 L5,53 L5,47 L6,38 L5,28 L6,18 L7,13 Z"
-                  fill="none"
-                  stroke="#3b82f6"
-                  strokeWidth="1.2"
-                  strokeLinejoin="round"
-                  opacity="0.12"
-                />
-                {/* Subtle region lines (Mississippi, Rockies hint) */}
-                <line x1="55" y1="6" x2="53" y2="72" stroke="#ffffff" strokeWidth="0.15" opacity="0.08" />
-                <line x1="28" y1="6" x2="30" y2="66" stroke="#ffffff" strokeWidth="0.15" opacity="0.08" />
-              </svg>
+        {/* ── Hour ticker banner ────────────────────────────────── */}
+        <div style={{
+          ...card,
+          borderLeft: '3px solid #D97706',
+          borderRadius: '0 12px 12px 0',
+          padding: '18px 28px',
+          display: 'flex', alignItems: 'center', gap: 0,
+        }}>
+          {/* This hour */}
+          <div style={{ minWidth: 180 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--navy-400)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 10 }}>
+              Labels This Hour
+            </div>
+            <div style={{ fontSize: 54, fontWeight: 800, color: '#D97706', lineHeight: 1, letterSpacing: '-0.03em' }}>
+              {fmt(hourTicker)}
+            </div>
+          </div>
 
-              {/* Vignette */}
-              <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 50% 50%, transparent 50%, rgba(6,16,30,0.75) 100%)', pointerEvents: 'none', zIndex: 2 }} />
+          <div style={{ width: 1, background: 'var(--navy-100)', alignSelf: 'stretch', margin: '0 28px' }} />
 
-              {/* City dots */}
-              {CITIES.map((city, i) => {
-                const isActive = activeDots.has(i);
-                const carrier  = CARRIERS[i % CARRIERS.length];
-                const color    = CARRIER_CFG[carrier].color;
+          {/* Per minute */}
+          <div style={{ minWidth: 120 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--navy-400)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 10 }}>
+              Per Minute (avg)
+            </div>
+            <div style={{ fontSize: 36, fontWeight: 700, color: 'var(--navy-900)', lineHeight: 1 }}>
+              {perMin}
+            </div>
+          </div>
+
+          <div style={{ width: 1, background: 'var(--navy-100)', alignSelf: 'stretch', margin: '0 28px' }} />
+
+          {/* Queued */}
+          <div style={{ minWidth: 100 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--navy-400)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 10 }}>
+              Queued
+            </div>
+            <div style={{ fontSize: 36, fontWeight: 700, color: 'var(--navy-900)', lineHeight: 1 }}>
+              {queued}
+            </div>
+          </div>
+
+          <div style={{ width: 1, background: 'var(--navy-100)', alignSelf: 'stretch', margin: '0 28px' }} />
+
+          {/* Hour progress */}
+          <div style={{ flex: 1, maxWidth: 240 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--navy-400)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 10 }}>
+              Hour Progress
+            </div>
+            <div style={{ height: 6, background: 'var(--navy-100)', borderRadius: 99, overflow: 'hidden' }}>
+              <div style={{
+                height: '100%', background: '#D97706',
+                width: `${hourProgress}%`, transition: 'width 1s linear',
+                borderRadius: 99,
+              }} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
+              <span style={{ fontSize: 11, color: 'var(--navy-500)', fontWeight: 500 }}>{minElapsed}m elapsed</span>
+              <span style={{ fontSize: 11, color: 'var(--navy-400)' }}>60m</span>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Map + Top States ──────────────────────────────────── */}
+        <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr', gap: 10, alignItems: 'start' }}>
+
+          {/* Choropleth map */}
+          <div style={card}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--navy-400)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 10 }}>
+              Shipment Density by State — Labels Today
+            </div>
+            {/* Legend */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, fontSize: 10, color: 'var(--navy-400)', fontWeight: 500 }}>
+              <span>Low</span>
+              <div style={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                {AMBER_STOPS.map(c => (
+                  <span key={c} style={{ width: 20, height: 9, background: c, display: 'inline-block', borderRadius: 2 }} />
+                ))}
+              </div>
+              <span>High</span>
+            </div>
+            <div ref={mapRef} style={{ width: '100%' }} />
+          </div>
+
+          {/* Top States */}
+          <div style={card}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--navy-400)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 14 }}>
+              Top States Today
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {TOP_STATES.map(([name, val], i) => {
+                const pct = Math.round((val / MAX_VAL) * 100);
                 return (
-                  <div key={city.name} title={`${city.name} · ${city.region}`} style={{
-                    position: 'absolute',
-                    left: `${city.x}%`,
-                    top:  `${city.y}%`,
-                    transform: 'translate(-50%, -50%)',
-                    zIndex: 3,
-                    cursor: 'default',
-                  }}>
-                    {/* Ripple ring (shown on active) */}
-                    {isActive && (
-                      <div style={{
-                        position: 'absolute',
-                        width: 18, height: 18,
-                        borderRadius: '50%',
-                        border: `1.5px solid ${color}`,
-                        top: '50%', left: '50%',
-                        transform: 'translate(-50%,-50%)',
-                        animation: 'la-ripple 1.8s ease-out infinite',
-                        pointerEvents: 'none',
-                      }} />
-                    )}
-                    {/* Pulse ring */}
-                    <div style={{
-                      position: 'absolute',
-                      width: 10, height: 10,
-                      borderRadius: '50%',
-                      background: color,
-                      opacity: 0.25,
-                      top: '50%', left: '50%',
-                      transform: 'translate(-50%,-50%)',
-                      animation: isActive ? `la-pulse 2s ease-out infinite` : undefined,
-                      pointerEvents: 'none',
-                    }} />
-                    {/* Core dot */}
-                    <div style={{
-                      width: isActive ? 7 : 4,
-                      height: isActive ? 7 : 4,
-                      borderRadius: '50%',
-                      background: isActive ? color : '#2a4a6e',
-                      boxShadow: isActive ? `0 0 10px ${CARRIER_CFG[carrier].glow}` : 'none',
-                      transition: 'all 0.4s ease',
-                      position: 'relative', zIndex: 4,
-                    }} />
-                    {/* City name label — only for active dots */}
-                    {isActive && (
-                      <div style={{
-                        position: 'absolute',
-                        top: 10, left: '50%',
-                        transform: 'translateX(-50%)',
-                        whiteSpace: 'nowrap',
-                        fontSize: '0.55rem',
-                        fontWeight: 700,
-                        color: 'rgba(255,255,255,0.8)',
-                        pointerEvents: 'none',
-                        textShadow: '0 1px 4px rgba(0,0,0,0.9)',
-                        letterSpacing: '0.02em',
-                      }}>
-                        {city.name}
+                  <div key={name}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--navy-400)', minWidth: 16 }}>{i + 1}</span>
+                        <span style={{ fontSize: 12, color: 'var(--navy-800)', fontWeight: 600 }}>
+                          {name.length > 14 ? name.slice(0, 13) + '…' : name}
+                        </span>
                       </div>
-                    )}
+                      <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--navy-700)' }}>
+                        {val.toLocaleString()}
+                      </span>
+                    </div>
+                    <div style={{ height: 4, background: 'var(--navy-100)', borderRadius: 99, overflow: 'hidden' }}>
+                      <div style={{
+                        height: '100%',
+                        width: `${pct}%`,
+                        background: i === 0 ? '#B45309' : i < 3 ? '#D97706' : '#F59E0B',
+                        borderRadius: 99,
+                        transition: 'width 1s',
+                      }} />
+                    </div>
                   </div>
                 );
               })}
-
-              {/* Floating counter badge */}
-              <div style={{
-                position: 'absolute', bottom: 14, right: 16, zIndex: 10,
-                background: 'rgba(255,255,255,0.06)',
-                backdropFilter: 'blur(8px)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: 10, padding: '8px 14px',
-              }}>
-                <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#f1f5f9', lineHeight: 1 }}>{fmt(base.today)}</div>
-                <div style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: 2 }}>labels today</div>
-              </div>
-
-              {/* Region activity label (follows last feed item) */}
-              {feed[0] && (
-                <div style={{
-                  position: 'absolute', top: 14, left: 16, zIndex: 10,
-                  background: `${CARRIER_CFG[feed[0].carrier].color}22`,
-                  border: `1px solid ${CARRIER_CFG[feed[0].carrier].color}44`,
-                  borderRadius: 8, padding: '5px 10px',
-                  animation: 'la-slidein 0.5s ease',
-                }}>
-                  <span style={{ fontSize: '0.68rem', fontWeight: 700, color: CARRIER_CFG[feed[0].carrier].color }}>
-                    +{feed[0].count} {feed[0].carrier} · {feed[0].region}
-                  </span>
-                </div>
-              )}
             </div>
           </div>
 
-          {/* Right panel: Carrier breakdown + 7-day chart */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-
-            {/* Carrier breakdown */}
-            <div className="sh-card" style={{ padding: '1rem 1.125rem' }}>
-              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--navy-400)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.875rem' }}>
-                Carrier Breakdown · Today
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
-                {CARRIERS.map(c => {
-                  const count = base.perCarrier[c] || 0;
-                  const pct   = totalToday > 0 ? Math.round((count / totalToday) * 100) : CARRIER_CFG[c].pct;
-                  return (
-                    <div key={c}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span style={{ width: 8, height: 8, borderRadius: '50%', background: CARRIER_CFG[c].color, display: 'inline-block' }} />
-                          <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--navy-700)' }}>{c}</span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span style={{ fontSize: '0.7rem', color: 'var(--navy-400)' }}>{fmt(count)}</span>
-                          <span style={{ fontSize: '0.72rem', fontWeight: 700, color: CARRIER_CFG[c].color, minWidth: 32, textAlign: 'right' }}>{pct}%</span>
-                        </div>
-                      </div>
-                      <div style={{ height: 6, background: 'var(--navy-100)', borderRadius: 99, overflow: 'hidden' }}>
-                        <div style={{
-                          height: '100%',
-                          width: `${pct}%`,
-                          background: CARRIER_CFG[c].color,
-                          borderRadius: 99,
-                          transition: 'width 0.9s cubic-bezier(0.4,0,0.2,1)',
-                        }} />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* 7-day mini bar chart */}
-            <div className="sh-card" style={{ padding: '1rem 1.125rem' }}>
-              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--navy-400)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.875rem' }}>
-                Last 7 Days
-              </div>
-              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 5, height: 64 }}>
-                {base.days7.map((v, i) => {
-                  const h = Math.round((v / maxDay) * 100);
-                  const isToday = i === 6;
-                  return (
-                    <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, height: '100%', justifyContent: 'flex-end' }}>
-                      <div title={`${fmt(v)} labels`} style={{
-                        width: '100%',
-                        height: `${h}%`,
-                        background: isToday ? '#3b82f6' : 'var(--navy-200)',
-                        borderRadius: '3px 3px 0 0',
-                        transition: 'height 0.8s cubic-bezier(0.4,0,0.2,1)',
-                        position: 'relative',
-                      }}>
-                        {isToday && (
-                          <div style={{ position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)', marginBottom: 2 }}>
-                            <span style={{ fontSize: '0.55rem', fontWeight: 700, color: '#3b82f6', whiteSpace: 'nowrap' }}>{fmt(v)}</span>
-                          </div>
-                        )}
-                      </div>
-                      <div style={{ fontSize: '0.55rem', color: isToday ? '#3b82f6' : 'var(--navy-400)', fontWeight: isToday ? 700 : 400 }}>
-                        {dayLabels[i]}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Active now indicator */}
-            <div style={{
-              borderRadius: 12, padding: '0.75rem 1rem',
-              background: 'linear-gradient(135deg, #0f172a, #1e293b)',
-              border: '1px solid #334155',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            }}>
-              <div>
-                <div style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700, marginBottom: 3 }}>
-                  Processing Now
-                </div>
-                <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#f1f5f9', letterSpacing: '-0.02em' }}>
-                  {rand(3, 18)} <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 400 }}>active jobs</span>
-                </div>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {CARRIERS.map(c => (
-                  <div key={c} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                    <span style={{ width: 5, height: 5, borderRadius: '50%', background: CARRIER_CFG[c].color, animation: 'la-blink 1.8s ease-in-out infinite', animationDelay: `${CARRIERS.indexOf(c) * 0.3}s`, display: 'inline-block' }} />
-                    <span style={{ fontSize: '0.65rem', color: '#475569', fontWeight: 600 }}>{c}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
         </div>
-
-        {/* ── Live feed ────────────────────────────────────────── */}
-        <div className="sh-card" style={{ padding: 0, overflow: 'hidden' }}>
-          <div style={{
-            padding: '0.75rem 1.125rem',
-            borderBottom: '1px solid var(--navy-100)',
-            display: 'flex', alignItems: 'center', gap: 8,
-            background: 'var(--navy-25)',
-          }}>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#22c55e', display: 'inline-block', animation: 'la-blink 1.2s ease-in-out infinite' }} />
-            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--navy-600)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-              Activity Feed
-            </span>
-            <span style={{ fontSize: '0.7rem', color: 'var(--navy-400)', marginLeft: 2 }}>
-              — live updates every ~45 seconds
-            </span>
-          </div>
-
-          <div ref={feedRef} style={{ maxHeight: 280, overflowY: 'auto' }}>
-            {feed.length === 0 ? (
-              <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--navy-400)', fontSize: '0.82rem' }}>
-                Waiting for activity…
-              </div>
-            ) : feed.map((item, idx) => {
-              const cfg = CARRIER_CFG[item.carrier];
-              return (
-                <div
-                  key={item.id}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 12,
-                    padding: '0.6rem 1.125rem',
-                    borderBottom: idx < feed.length - 1 ? '1px solid var(--navy-50)' : 'none',
-                    animation: item.age < 3 ? 'la-slidein 0.4s ease' : undefined,
-                    background: item.age < 3 ? `${cfg.color}08` : 'transparent',
-                    transition: 'background 1s',
-                  }}
-                >
-                  {/* Carrier dot */}
-                  <div style={{
-                    width: 8, height: 8, borderRadius: '50%',
-                    background: cfg.color, flexShrink: 0,
-                    boxShadow: item.age < 10 ? `0 0 6px ${cfg.glow}` : 'none',
-                  }} />
-
-                  {/* Carrier badge */}
-                  <span style={{
-                    padding: '2px 8px', borderRadius: 6, fontSize: '0.68rem', fontWeight: 800,
-                    background: `${cfg.color}18`, color: cfg.color, flexShrink: 0, minWidth: 46, textAlign: 'center',
-                  }}>
-                    {item.carrier}
-                  </span>
-
-                  {/* Count */}
-                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--navy-900)', flexShrink: 0 }}>
-                    +{item.count} labels
-                  </span>
-
-                  {/* Location */}
-                  <span style={{ fontSize: '0.78rem', color: 'var(--navy-500)', flex: 1 }}>
-                    {item.city} · {item.region}
-                  </span>
-
-                  {/* Time */}
-                  <span style={{ fontSize: '0.7rem', color: 'var(--navy-400)', flexShrink: 0 }}>
-                    {ageLabel(item.age)}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
       </div>
     </>
   );

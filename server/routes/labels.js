@@ -190,6 +190,15 @@ router.post('/single', authenticateToken, [
       req.io.to(req.user._id.toString()).emit('label-generated', {
         labelId: label._id, trackingId, carrier: vendor.carrier
       });
+      // Real-time feed for admin live monitor
+      req.io.to('admin-room').emit('admin-label-generated', {
+        carrier:   vendor.carrier,
+        trackingId,
+        price:     label.price || 0,
+        toState:   label.to_state || '',
+        toCity:    label.to_city  || '',
+        createdAt: label.createdAt,
+      });
     }
 
     res.status(201).json({
@@ -568,6 +577,58 @@ router.get('/pdf/:filename', authenticateToken, (req, res) => {
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
   fs.createReadStream(filePath).pipe(res);
+});
+
+// ── GET /api/labels/:id/pdf  ──────────────────────────────────
+// Proxy-serve a label PDF by label ID.
+// Works for both S3 / external URLs and locally stored files.
+// Accepts ?inline=1 to open in browser instead of downloading.
+router.get('/:id/pdf', authenticateToken, async (req, res) => {
+  try {
+    const label = await Label.findById(req.params.id).select('user pdfUrl awsPath trackingId');
+    if (!label) return res.status(404).json({ message: 'Label not found' });
+
+    // Only the label owner or admin can access
+    if (req.user.role !== 'admin' && label.user.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Forbidden' });
+    }
+
+    const src = label.pdfUrl || label.awsPath;
+    if (!src) return res.status(404).json({ message: 'No PDF available for this label' });
+
+    const safeName  = `label-${label.trackingId || label._id}.pdf`;
+    const inline    = req.query.inline === '1';
+    const disp      = inline ? 'inline' : 'attachment';
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `${disp}; filename="${safeName}"`);
+
+    // External URL (S3 or ShippersHub CDN) — fetch server-side and pipe back
+    if (src.startsWith('http://') || src.startsWith('https://')) {
+      const https = require('https');
+      const http  = require('http');
+      const mod   = src.startsWith('https') ? https : http;
+      mod.get(src, (upstream) => {
+        if (upstream.statusCode !== 200) {
+          res.status(502).end('Could not fetch PDF from storage');
+          return;
+        }
+        upstream.pipe(res);
+      }).on('error', () => res.status(502).json({ message: 'Could not fetch PDF from storage' }));
+      return;
+    }
+
+    // Local file — strip any path prefix, look in labelsDir
+    const localPath = path.join(labelsDir, path.basename(src));
+    if (!fs.existsSync(localPath)) {
+      return res.status(404).json({ message: 'PDF file not found on server' });
+    }
+    fs.createReadStream(localPath).pipe(res);
+
+  } catch (err) {
+    console.error('Label PDF proxy error:', err);
+    res.status(500).json({ message: 'Error serving PDF' });
+  }
 });
 
 // ── GET /api/labels/zip/:filename ─────────────────────────────
