@@ -25,6 +25,8 @@ import {
   MegaphoneIcon,
   Cog6ToothIcon,
   ClockIcon,
+  CreditCardIcon,
+  GiftIcon,
 } from '@heroicons/react/24/outline';
 
 // ── Announcement types ────────────────────────────────────────────────────────
@@ -175,9 +177,11 @@ const Layout: React.FC = () => {
 
   // ── Navigation definitions ──────────────────────────────────────────────
   const overviewNav: NavItem[] = [
-    { name: 'Dashboard',      href: '/dashboard',      icon: HomeIcon,      current: location.pathname === '/dashboard' },
-    { name: 'Announcements',  href: '/announcements',  icon: MegaphoneIcon, current: location.pathname === '/announcements' },
-    { name: 'Live Activity',  href: '/activity',       icon: SignalIcon,    current: location.pathname === '/activity'  },
+    { name: 'Dashboard',      href: '/dashboard',      icon: HomeIcon,        current: location.pathname === '/dashboard' },
+    { name: 'Announcements',  href: '/announcements',  icon: MegaphoneIcon,   current: location.pathname === '/announcements' },
+    { name: 'Live Activity',  href: '/activity',       icon: SignalIcon,      current: location.pathname === '/activity'  },
+    { name: 'Packages',       href: '/packages',       icon: GiftIcon,        current: location.pathname === '/packages' },
+    { name: 'Credit Score',   href: '/credit',         icon: CreditCardIcon,  current: location.pathname === '/credit' },
   ];
 
   const labelsNav: NavItem[] = [

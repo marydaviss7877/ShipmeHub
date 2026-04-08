@@ -35,6 +35,8 @@ import FinancialDashboard  from './pages/FinancialDashboard';
 import Settings            from './pages/Settings';
 import AttendanceAdmin     from './pages/AttendanceAdmin';
 import AttendanceCheckIn   from './pages/AttendanceCheckIn';
+import Packages            from './pages/Packages';
+import CreditScore         from './pages/CreditScore';
 import './App.css';
 
 // Shorthand wrappers to keep JSX clean
@@ -85,6 +87,8 @@ function App() {
                   <Route path="manifest/upload"     element={<Navigate to="/labels/bulk" replace />} />
                   <Route path="manifest/history"    element={<ManifestHistory />} />
                   <Route path="activity"            element={<LiveActivity />} />
+                  <Route path="packages"            element={<Packages />} />
+                  <Route path="credit"              element={<CreditScore />} />
                   <Route path="attendance/checkin"  element={<AttendanceCheckIn />} />
 
                   {/* Admin-only routes */}

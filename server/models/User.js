@@ -62,7 +62,18 @@ const userSchema = new mongoose.Schema({
   emailNotifications: {
     type: Boolean,
     default: true,
-  }
+  },
+  // Credit facility — admin-controlled
+  creditLimit: {
+    type: Number,
+    default: 0,
+    min: 0,
+  },
+  creditUsed: {
+    type: Number,
+    default: 0,
+    min: 0,
+  },
 }, {
   timestamps: true
 });

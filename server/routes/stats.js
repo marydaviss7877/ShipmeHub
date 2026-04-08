@@ -266,6 +266,57 @@ async function userStats(userId) {
   };
 }
 
+// ── GET /api/stats/credit  — credit score + limit for current user ────────────
+router.get('/credit', authenticateToken, async (req, res) => {
+  try {
+    const uid  = new mongoose.Types.ObjectId(String(req.user._id));
+    const user = await User.findById(uid).select('creditLimit creditUsed createdAt');
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    const [balance, labelCount] = await Promise.all([
+      Balance.getOrCreateBalance(req.user._id),
+      Label.countDocuments({ user: uid }),
+    ]);
+
+    const txns         = balance.transactions || [];
+    const totalDeposited = txns.filter(t => t.type === 'topup').reduce((s, t) => s + t.amount, 0);
+    const accountAgeDays = Math.floor((Date.now() - new Date(user.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+
+    // Score components
+    const ageScore      = Math.min(100, Math.floor((accountAgeDays / 730) * 100));
+    const labelScore    = Math.min(200, Math.floor((labelCount / 500) * 200));
+    const depositScore  = Math.min(200, Math.floor((totalDeposited / 1000) * 200));
+    const activityScore = labelCount > 0 ? 50 : 0;
+    const creditScore   = Math.min(850, 300 + ageScore + labelScore + depositScore + activityScore);
+
+    const creditLimit     = user.creditLimit  || 0;
+    const creditUsed      = user.creditUsed   || 0;
+    const creditAvailable = Math.max(0, creditLimit - creditUsed);
+
+    res.json({
+      creditScore,
+      creditLimit,
+      creditUsed,
+      creditAvailable,
+      breakdown: {
+        base:            300,
+        accountAge:      ageScore,
+        labelsGenerated: labelScore,
+        depositHistory:  depositScore,
+        activityBonus:   activityScore,
+      },
+      factors: {
+        accountAgeDays,
+        totalLabels:     labelCount,
+        totalDeposited,
+      },
+    });
+  } catch (err) {
+    console.error('Credit score error:', err);
+    res.status(500).json({ message: 'Error fetching credit score' });
+  }
+});
+
 // ── GET /api/stats/admin-live  (admin only) ──────────────────────────────────
 // Real-time platform snapshot for the admin live monitor page.
 router.get('/admin-live', authenticateToken, async (req, res) => {

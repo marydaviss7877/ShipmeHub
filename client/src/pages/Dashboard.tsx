@@ -273,11 +273,129 @@ const HeroBanner = ({ greeting, name, dateLabel, balanceLabel, balance, onCta }:
   </div>
 );
 
+// ── AddBalanceModal ───────────────────────────────────────────────────────────
+const AddBalanceModal = ({
+  open, onClose, onViewPackages,
+}: { open: boolean; onClose: () => void; onViewPackages: () => void }) => {
+  if (!open) return null;
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 1000,
+        background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '1rem',
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: '#fff', borderRadius: 20, padding: '2rem 2.25rem',
+          maxWidth: 440, width: '100%',
+          boxShadow: '0 24px 60px rgba(0,0,0,0.18)',
+        }}
+      >
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              width: 44, height: 44, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'linear-gradient(135deg, #22c55e22, #22c55e0d)', border: '1px solid #22c55e28',
+            }}>
+              <CurrencyDollarIcon style={{ width: 22, height: 22, color: '#22c55e' }} />
+            </div>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--navy-800)' }}>Add Balance</h3>
+              <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--navy-400)' }}>Account top-up</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--navy-400)', fontSize: '1.2rem', lineHeight: 1 }}
+          >✕</button>
+        </div>
+
+        {/* Message */}
+        <div style={{
+          background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 12,
+          padding: '1rem 1.25rem', marginBottom: '1.25rem',
+        }}>
+          <p style={{ margin: 0, fontSize: '0.87rem', color: '#166534', fontWeight: 600, marginBottom: 4 }}>
+            Ready to recharge?
+          </p>
+          <p style={{ margin: 0, fontSize: '0.82rem', color: '#15803d', lineHeight: 1.55 }}>
+            To add balance to your account, please contact your <strong>account manager</strong> or our <strong>sales team</strong>. They will process your top-up and confirm once funds are credited.
+          </p>
+        </div>
+
+        {/* Contact options */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: '1.5rem' }}>
+          <a
+            href="mailto:support@shipmehub.com"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 12,
+              padding: '0.75rem 1rem', borderRadius: 10,
+              background: '#f8fafc', border: '1px solid #e2e8f0',
+              color: 'var(--navy-700)', textDecoration: 'none',
+              fontSize: '0.82rem', fontWeight: 600,
+            }}
+          >
+            <span style={{ fontSize: '1rem' }}>📧</span>
+            support@shipmehub.com
+          </a>
+          <a
+            href="https://wa.me/message/shipmehub"
+            target="_blank" rel="noreferrer"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 12,
+              padding: '0.75rem 1rem', borderRadius: 10,
+              background: '#f0fdf4', border: '1px solid #bbf7d0',
+              color: '#166534', textDecoration: 'none',
+              fontSize: '0.82rem', fontWeight: 600,
+            }}
+          >
+            <span style={{ fontSize: '1rem' }}>💬</span>
+            WhatsApp Support
+          </a>
+        </div>
+
+        {/* Footer */}
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button
+            onClick={onViewPackages}
+            style={{
+              flex: 1, padding: '0.65rem', borderRadius: 10,
+              background: 'linear-gradient(135deg, #1D4ED8, #6366f1)',
+              border: 'none', color: '#fff', fontWeight: 700,
+              fontSize: '0.82rem', cursor: 'pointer',
+            }}
+          >
+            View Packages →
+          </button>
+          <button
+            onClick={onClose}
+            style={{
+              flex: 1, padding: '0.65rem', borderRadius: 10,
+              background: '#f1f5f9', border: '1px solid #e2e8f0',
+              color: 'var(--navy-600)', fontWeight: 600,
+              fontSize: '0.82rem', cursor: 'pointer',
+            }}
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ── User Dashboard ─────────────────────────────────────────────────────────────
 const UserDashboard: React.FC<{ firstName: string }> = ({ firstName }) => {
   const navigate = useNavigate();
-  const [stats, setStats]     = useState<UserStats | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [stats, setStats]           = useState<UserStats | null>(null);
+  const [loading, setLoading]       = useState(true);
+  const [showAddBalance, setShowAddBalance] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -307,7 +425,7 @@ const UserDashboard: React.FC<{ firstName: string }> = ({ firstName }) => {
       <HeroBanner
         greeting={greeting} name={firstName} dateLabel={dateLabel}
         balanceLabel="Current Balance" balance={fmt$(balance.currentBalance)}
-        onCta={() => navigate('/profile')}
+        onCta={() => setShowAddBalance(true)}
       />
 
       {/* KPI Grid */}
@@ -457,6 +575,9 @@ const UserDashboard: React.FC<{ firstName: string }> = ({ firstName }) => {
           <QuickAction label="Label History" sub="View all generated labels" Icon={ClockIcon}                 color="#f59e0b" onClick={() => navigate('/labels/history')} />
         </div>
       </div>
+
+      {/* Add Balance Modal */}
+      <AddBalanceModal open={showAddBalance} onClose={() => setShowAddBalance(false)} onViewPackages={() => { setShowAddBalance(false); navigate('/packages'); }} />
     </div>
   );
 };
@@ -464,8 +585,9 @@ const UserDashboard: React.FC<{ firstName: string }> = ({ firstName }) => {
 // ── Reseller Dashboard ────────────────────────────────────────────────────────
 const ResellerDashboard: React.FC<{ firstName: string }> = ({ firstName }) => {
   const navigate = useNavigate();
-  const [stats, setStats]     = useState<ResellerStats | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [stats, setStats]           = useState<ResellerStats | null>(null);
+  const [loading, setLoading]       = useState(true);
+  const [showAddBalance, setShowAddBalance] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -493,7 +615,7 @@ const ResellerDashboard: React.FC<{ firstName: string }> = ({ firstName }) => {
       <HeroBanner
         greeting={greeting} name={firstName} dateLabel={dateLabel}
         balanceLabel="My Balance" balance={fmt$(myBalance.currentBalance)}
-        onCta={() => navigate('/profile')}
+        onCta={() => setShowAddBalance(true)}
       />
 
       {/* KPI Grid */}
@@ -618,6 +740,9 @@ const ResellerDashboard: React.FC<{ firstName: string }> = ({ firstName }) => {
           <QuickAction label="Bulk Labels"    sub="Upload CSV for many labels"  Icon={ClipboardDocumentListIcon} color="#f59e0b" onClick={() => navigate('/labels/bulk')} />
         </div>
       </div>
+
+      {/* Add Balance Modal */}
+      <AddBalanceModal open={showAddBalance} onClose={() => setShowAddBalance(false)} onViewPackages={() => { setShowAddBalance(false); navigate('/packages'); }} />
     </div>
   );
 };
