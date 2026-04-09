@@ -2,7 +2,7 @@ const express    = require('express');
 const multer     = require('multer');
 const path       = require('path');
 const fs         = require('fs');
-const mongoose   = require('mongoose');
+const mongoose   = require('mongoose'); // already imported — used for ObjectId validation
 const PaymentLog = require('../models/PaymentLog');
 const User       = require('../models/User');
 const SalesAgentProfile = require('../models/SalesAgentProfile');
@@ -73,10 +73,17 @@ router.get('/screenshot/:filename', (req, res) => {
 router.get('/:userId', authenticateToken, authorize('admin', 'reseller'), async (req, res) => {
   try {
     const { userId } = req.params;
+
+    // Guard: userId must be a 24-char hex ObjectId. Reject anything else to prevent
+    // Mongoose 9 stripping undefined and returning the entire collection.
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID' });
+    }
+
     if (!await canManage(req.user, userId))
       return res.status(403).json({ message: 'Access denied' });
 
-    const logs = await PaymentLog.find({ user: userId })
+    const logs = await PaymentLog.find({ user: new mongoose.Types.ObjectId(userId) })
       .populate('loggedBy', 'firstName lastName')
       .populate('wallet', 'name')
       .sort({ date: -1 });

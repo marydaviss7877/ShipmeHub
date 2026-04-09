@@ -66,6 +66,7 @@ const txDot = (t: string) =>
 
 const ResellerClients: React.FC = () => {
   const { user: authUser } = useAuth();
+  const fetchingForRef = useRef<string | null>(null);
 
   // ── Clients list ─────────────────────────────────────────────
   const [clients,      setClients]      = useState<Client[]>([]);
@@ -150,7 +151,7 @@ const ResellerClients: React.FC = () => {
     setLoadingBal(true);
     try {
       const res = await axios.get(`/balance/${id}`);
-      setBalance(res.data);
+      if (fetchingForRef.current === id) setBalance(res.data);
     } catch {}
     finally { setLoadingBal(false); }
   };
@@ -158,6 +159,7 @@ const ResellerClients: React.FC = () => {
   const fetchPayLogs = async (id: string) => {
     try {
       const res = await axios.get(`/payment-logs/${id}`);
+      if (fetchingForRef.current !== id) return; // discard stale response
       setPayLogs(res.data.logs || []);
       setTotalPaid(res.data.totalPaid || 0);
     } catch {}
@@ -216,12 +218,14 @@ const ResellerClients: React.FC = () => {
 
   // ── Client actions ────────────────────────────────────────────
   const selectClient = (c: Client) => {
+    fetchingForRef.current = clientId(c);
     setSelectedClient(c);
     setClientForm({ firstName: c.firstName, lastName: c.lastName, email: c.email, password: '' });
     setIsCreating(false);
     setActiveTab('edit');
     setBalAction('');
     setShowPayForm(false);
+    setBalance(null);  // clear stale balance data
     setPayLogs([]);
     setTotalPaid(0);
   };

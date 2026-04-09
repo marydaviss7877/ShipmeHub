@@ -50,32 +50,8 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
-// ── GET /api/balance/:userId ──────────────────────────────────
-router.get('/:userId', authenticateToken, async (req, res) => {
-  try {
-    const { userId } = req.params;
-
-    if (req.user.role !== 'admin' && req.user._id.toString() !== userId) {
-      const target = await User.findById(userId);
-      if (!target) return res.status(404).json({ message: 'User not found' });
-      const isMyClient = (req.user.clients || []).map(String).includes(userId);
-      if (!isMyClient) return res.status(403).json({ message: 'Access denied' });
-    }
-
-    const balance = await Balance.getOrCreateBalance(userId);
-    const recentTransactions = balance.transactions
-      .slice()
-      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-      .slice(0, 10);
-
-    res.json({ currentBalance: balance.currentBalance, recentTransactions });
-  } catch (error) {
-    console.error('Get balance by userId error:', error);
-    res.status(500).json({ message: 'Server error getting balance' });
-  }
-});
-
 // ── GET /api/balance/transactions ─────────────────────────────
+// IMPORTANT: must be declared BEFORE /:userId so Express matches it first.
 router.get('/transactions', authenticateToken, async (req, res) => {
   try {
     const page  = Math.max(1, parseInt(req.query.page) || 1);
@@ -98,6 +74,38 @@ router.get('/transactions', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Get transactions error:', error);
     res.status(500).json({ message: 'Server error getting transactions' });
+  }
+});
+
+// ── GET /api/balance/:userId ──────────────────────────────────
+// IMPORTANT: declared AFTER /transactions so fixed paths match first.
+router.get('/:userId', authenticateToken, async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Reject non-ObjectId values (prevents Mongoose 9 stripping undefined → full-collection query)
+    const mongoose = require('mongoose');
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID' });
+    }
+
+    if (req.user.role !== 'admin' && req.user._id.toString() !== userId) {
+      const target = await User.findById(userId);
+      if (!target) return res.status(404).json({ message: 'User not found' });
+      const isMyClient = (req.user.clients || []).map(String).includes(userId);
+      if (!isMyClient) return res.status(403).json({ message: 'Access denied' });
+    }
+
+    const balance = await Balance.getOrCreateBalance(userId);
+    const recentTransactions = balance.transactions
+      .slice()
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .slice(0, 10);
+
+    res.json({ currentBalance: balance.currentBalance, recentTransactions });
+  } catch (error) {
+    console.error('Get balance by userId error:', error);
+    res.status(500).json({ message: 'Server error getting balance' });
   }
 });
 

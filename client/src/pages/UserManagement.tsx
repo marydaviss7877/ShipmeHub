@@ -26,7 +26,7 @@ interface VendorAccess {
 }
 interface Balance {
   currentBalance: number;
-  recentTransactions: Array<{ type: string; amount: number; description: string; date: string }>;
+  recentTransactions: Array<{ type: string; amount: number; description: string; createdAt: string }>;
 }
 interface Wallet {
   _id: string; name: string; description: string; isActive: boolean;
@@ -69,6 +69,10 @@ const txDot = (t: string) =>
 
 const UserManagement: React.FC = () => {
   const { user: authUser } = useAuth();
+
+  // Tracks which userId the in-flight fetch is for — prevents stale responses
+  // from a previous user overwriting the current user's logs.
+  const fetchingForRef = React.useRef<string | null>(null);
 
   // ── Users list ───────────────────────────────────────────────
   const [users,        setUsers]        = useState<User[]>([]);
@@ -138,8 +142,12 @@ const UserManagement: React.FC = () => {
 
   useEffect(() => {
     if (!selectedUser || isCreating) return;
-    if (activeTab === 'balance') { fetchBalance(selectedUser.id); fetchPayLogs(selectedUser.id); }
-    if (activeTab === 'tiers')   fetchTiers(selectedUser.id);
+    if (activeTab === 'balance') {
+      fetchingForRef.current = selectedUser.id; // mark which user we're fetching for
+      fetchBalance(selectedUser.id);
+      fetchPayLogs(selectedUser.id);
+    }
+    if (activeTab === 'tiers') fetchTiers(selectedUser.id);
   }, [activeTab, selectedUser]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -176,7 +184,8 @@ const UserManagement: React.FC = () => {
     setLoadingBal(true);
     try {
       const res = await axios.get(`/balance/${id}`);
-      setBalance(res.data);
+      // Only apply if this fetch is still for the currently selected user
+      if (fetchingForRef.current === id) setBalance(res.data);
     } catch {}
     finally { setLoadingBal(false); }
   };
@@ -184,6 +193,8 @@ const UserManagement: React.FC = () => {
   const fetchPayLogs = async (id: string) => {
     try {
       const res = await axios.get(`/payment-logs/${id}`);
+      // Discard stale response if user changed while fetch was in flight
+      if (fetchingForRef.current !== id) return;
       setPayLogs(res.data.logs || []);
       setTotalPaid(res.data.totalPaid || 0);
       setIsSalesAgentClient(res.data.isSalesAgentClient || false);
@@ -245,12 +256,16 @@ const UserManagement: React.FC = () => {
 
   // ── User actions ─────────────────────────────────────────────
   const selectUser = (u: User) => {
+    // Update the ref immediately so any in-flight fetches for the old user
+    // will see a mismatch and discard their stale responses.
+    fetchingForRef.current = u.id;
     setSelectedUser(u);
     setUserForm({ firstName: u.firstName, lastName: u.lastName, email: u.email, password: '', role: u.role, source: (u as any).source || '' });
     setIsCreating(false);
     setActiveTab('edit');
     setBalAction('');
     setShowPayForm(false);
+    setBalance(null);   // clear stale balance so old user's data doesn't flash
     setPayLogs([]);
     setTotalPaid(0);
   };
@@ -722,7 +737,7 @@ const UserManagement: React.FC = () => {
                               <span className={`status-dot ${txDot(tx.type)}`} />
                               <div>
                                 <div style={{ fontSize: '0.75rem', color: 'var(--navy-800)' }}>{tx.description}</div>
-                                <div style={{ fontSize: '0.68rem', color: 'var(--navy-400)' }}>{new Date(tx.date).toLocaleDateString()}</div>
+                                <div style={{ fontSize: '0.68rem', color: 'var(--navy-400)' }}>{new Date(tx.createdAt).toLocaleDateString()}</div>
                               </div>
                             </div>
                             <span style={{ fontSize: '0.78rem', fontWeight: 700, color: txColor(tx.type) }}>
