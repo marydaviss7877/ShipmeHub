@@ -9,7 +9,6 @@ const EquityPartner     = require('../models/EquityPartner');
 const Label             = require('../models/Label');
 const ManifestJob       = require('../models/ManifestJob');
 const PaymentLog        = require('../models/PaymentLog');
-const SalesAgentProfile = require('../models/SalesAgentProfile');
 const User              = require('../models/User');
 const VendorCost        = require('../models/VendorCost');
 const Wallet            = require('../models/Wallet');
@@ -28,7 +27,6 @@ router.get('/', authenticateToken, authorize('admin'), async (req, res) => {
       { rate },
       allClients,
       vendorCosts,
-      agentProfiles,
       partners,
       cashbookDebits,
       cashbookCredits,
@@ -37,9 +35,6 @@ router.get('/', authenticateToken, authorize('admin'), async (req, res) => {
       getUsdToPkrRate(280),
       User.find({ role: 'user' }).select('_id source firstName lastName email').lean(),
       VendorCost.find({ month, year }).lean(),
-      SalesAgentProfile.find()
-        .populate('user', '_id firstName lastName email clients')
-        .lean(),
       EquityPartner.find({ isActive: true }).lean(),
       CashBookEntry.find({ entryType: 'debit',  date: { $gte: start, $lt: end } })
         .populate('category', 'name type').populate('wallet', 'name').lean(),
@@ -51,27 +46,9 @@ router.get('/', authenticateToken, authorize('admin'), async (req, res) => {
     const clientIds    = allClients.map(c => c._id);
     const walletMap    = Object.fromEntries(allWallets.map(w => [w._id.toString(), w.name]));
 
-    // Build agent → clientId[] map from populated user.clients
-    // agentProfiles[].user.clients is an array of ObjectIds
-    const agentClientMap = {}; // agentProfileId → [clientId]
-    for (const profile of agentProfiles) {
-      if (!profile.user) continue;
-      const userDoc = await User.findById(profile.user._id || profile.user)
-        .select('clients').lean();
-      agentClientMap[profile._id.toString()] = (userDoc?.clients || []).map(String);
-    }
-
-    // All client IDs that belong to any agent (flat)
-    const allAgentClientIds = [
-      ...new Set(Object.values(agentClientMap).flat()),
-    ];
-
     // ── PHASE 2: batch aggregations in parallel ───────────────────────────────
     const [
       totalPayAgg,
-      perUserPayAgg,
-      perUserCarrierLabelAgg,
-      perUserCarrierMfAgg,
       carrierLabelAgg,
       carrierMfAgg,
       orgPayAgg,
@@ -82,21 +59,6 @@ router.get('/', authenticateToken, authorize('admin'), async (req, res) => {
       PaymentLog.aggregate([
         { $match: { user: { $in: clientIds }, date: { $gte: start, $lt: end } } },
         { $group: { _id: null, totalUSD: { $sum: '$amount' } } },
-      ]),
-      // Payment per client (for sales team breakdown)
-      PaymentLog.aggregate([
-        { $match: { user: { $in: clientIds }, date: { $gte: start, $lt: end } } },
-        { $group: { _id: '$user', totalUSD: { $sum: '$amount' } } },
-      ]),
-      // Labels per client per carrier
-      Label.aggregate([
-        { $match: { user: { $in: clientIds }, createdAt: { $gte: start, $lt: end }, status: 'generated' } },
-        { $group: { _id: { user: '$user', carrier: '$carrier' }, count: { $sum: 1 } } },
-      ]),
-      // ManifestJobs per client per carrier
-      ManifestJob.aggregate([
-        { $match: { user: { $in: clientIds }, createdAt: { $gte: start, $lt: end }, status: 'completed' } },
-        { $group: { _id: { user: '$user', carrier: '$carrier' }, count: { $sum: '$userBilling.labelCount' } } },
       ]),
       // Total labels per carrier (for overall cost distribution)
       Label.aggregate([
@@ -125,18 +87,6 @@ router.get('/', authenticateToken, authorize('admin'), async (req, res) => {
     ]);
 
     // ── Build lookup maps ─────────────────────────────────────────────────────
-
-    // perUserPayMap: userId → totalUSD
-    const perUserPayMap = Object.fromEntries(
-      perUserPayAgg.map(r => [r._id.toString(), r.totalUSD])
-    );
-
-    // perUserCarrierMap: `${userId}:${carrier}` → count
-    const perUserCarrierMap = {};
-    [...perUserCarrierLabelAgg, ...perUserCarrierMfAgg].forEach(r => {
-      const key = `${r._id.user}:${r._id.carrier}`;
-      perUserCarrierMap[key] = (perUserCarrierMap[key] || 0) + r.count;
-    });
 
     // carrierCounts: carrier → total labels
     const carrierCounts = {};
@@ -167,24 +117,6 @@ router.get('/', authenticateToken, authorize('admin'), async (req, res) => {
     });
     const totalVendorCostPKR = totalVendorCostUSD * rate;
 
-    // ── Salary expense ────────────────────────────────────────────────────────
-    let totalSalaryPKR = 0;
-    const salarySummary = agentProfiles.map(profile => {
-      const monthLogs = (profile.salaryLogs || []).filter(
-        l => l.month === month && l.year === year
-      );
-      const totalPaid = monthLogs.reduce((s, l) => s + (l.totalPaid || 0), 0);
-      totalSalaryPKR += totalPaid;
-      return {
-        agentId:      profile._id,
-        agentName:    profile.user ? `${profile.user.firstName} ${profile.user.lastName}` : 'Unknown',
-        baseSalaryPKR: profile.baseSalaryPKR,
-        totalPaid,
-        remainingDue: Math.max(0, (profile.baseSalaryPKR || 0) - totalPaid),
-        logs:         monthLogs,
-      };
-    });
-
     // ── Cash book totals ──────────────────────────────────────────────────────
     const totalExpensesPKR        = cashbookDebits.reduce((s, e) => s + e.amountPKR, 0);
     const totalCashbookCreditsPKR = cashbookCredits.reduce((s, e) => s + e.amountPKR, 0);
@@ -201,7 +133,7 @@ router.get('/', authenticateToken, authorize('admin'), async (req, res) => {
     const expenseBreakdown = Object.values(expenseByCategoryMap).sort((a, b) => b.totalPKR - a.totalPKR);
 
     // ── Net profit & equity ───────────────────────────────────────────────────
-    const netProfitPKR = totalRevenuePKR - totalVendorCostPKR - totalSalaryPKR - totalExpensesPKR;
+    const netProfitPKR = totalRevenuePKR - totalVendorCostPKR - totalExpensesPKR;
     const equityDistribution = partners.map(p => ({
       name:             p.name,
       ownershipPercent: p.ownershipPercent,
@@ -217,8 +149,8 @@ router.get('/', authenticateToken, authorize('admin'), async (req, res) => {
       organic: {
         revenueUSD:       orgPayAgg[0]?.totalUSD || 0,
         revenuePKR:       (orgPayAgg[0]?.totalUSD || 0) * rate,
-        operatingCostPKR: totalSalaryPKR,
-        profitPKR:        ((orgPayAgg[0]?.totalUSD || 0) * rate) - totalSalaryPKR,
+        operatingCostPKR: advertisingExpensePKR,
+        profitPKR:        (orgPayAgg[0]?.totalUSD || 0) * rate,
       },
       paidAds: {
         revenueUSD:       paidPayAgg[0]?.totalUSD || 0,
@@ -227,48 +159,6 @@ router.get('/', authenticateToken, authorize('admin'), async (req, res) => {
         profitPKR:        ((paidPayAgg[0]?.totalUSD || 0) * rate) - advertisingExpensePKR,
       },
     };
-
-    // ── Sales team (pure JS, no extra DB calls) ───────────────────────────────
-    const salesTeam = agentProfiles
-      .filter(p => p.user)
-      .map(profile => {
-        const pid          = profile._id.toString();
-        const agentClients = agentClientMap[pid] || [];
-
-        // Sum client payments from pre-fetched map
-        const agentRevUSD = agentClients.reduce(
-          (s, cid) => s + (perUserPayMap[cid] || 0), 0
-        );
-
-        // Sum vendor costs from pre-fetched carrier-user map
-        const agentCarrierCounts = {};
-        agentClients.forEach(cid => {
-          vendorCosts.forEach(vc => {
-            const key   = `${cid}:${vc.carrier}`;
-            const count = perUserCarrierMap[key] || 0;
-            agentCarrierCounts[vc.carrier] = (agentCarrierCounts[vc.carrier] || 0) + count;
-          });
-        });
-        const agentVendorCostUSD = vendorCosts.reduce(
-          (s, vc) => s + (agentCarrierCounts[vc.carrier] || 0) * vc.costPerLabelUSD, 0
-        );
-
-        const monthLogs     = (profile.salaryLogs || []).filter(l => l.month === month && l.year === year);
-        const salaryCostPKR = monthLogs.reduce((s, l) => s + (l.totalPaid || 0), 0);
-        const agentRevPKR   = agentRevUSD * rate;
-        const vendorPKR     = agentVendorCostUSD * rate;
-
-        return {
-          agentId:       profile._id,
-          agentName:     `${profile.user.firstName || ''} ${profile.user.lastName || ''}`.trim(),
-          clientCount:   agentClients.length,
-          revenueUSD:    agentRevUSD,
-          revenuePKR:    agentRevPKR,
-          salaryCostPKR,
-          vendorCostPKR: vendorPKR,
-          netProfitPKR:  agentRevPKR - salaryCostPKR - vendorPKR,
-        };
-      });
 
     // ── Wallet summary ────────────────────────────────────────────────────────
     const cashbookByWallet = {};
@@ -317,7 +207,6 @@ router.get('/', authenticateToken, authorize('admin'), async (req, res) => {
         totalRevenuePKR:    Math.round(totalRevenuePKR),
         totalRevenueUSD,
         totalVendorCostPKR: Math.round(totalVendorCostPKR),
-        totalSalaryPKR:     Math.round(totalSalaryPKR),
         totalExpensesPKR:   Math.round(totalExpensesPKR),
         netProfitPKR:       Math.round(netProfitPKR),
         totalLabels,
@@ -325,7 +214,6 @@ router.get('/', authenticateToken, authorize('admin'), async (req, res) => {
       },
       equityDistribution,
       revenueBySource,
-      salesTeam,
       carrierCostDistribution,
       vendorCostDistribution: vendorCostDetails,
       walletSummary,
@@ -335,7 +223,6 @@ router.get('/', authenticateToken, authorize('admin'), async (req, res) => {
         netFlowPKR:      totalCashbookCreditsPKR - totalExpensesPKR,
       },
       expenseBreakdown,
-      salarySummary,
     });
   } catch (err) {
     console.error('[FinancialDashboard] GET /:', err);

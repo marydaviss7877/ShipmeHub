@@ -28,13 +28,10 @@ import VendorJobDetail from './pages/vendor/VendorJobDetail';
 import VendorEarnings  from './pages/vendor/VendorEarnings';
 import ManifestHistory from './pages/ManifestHistory';
 import ResellerClients from './pages/ResellerClients';
-import SalesAgents         from './pages/SalesAgents';
 import Finance             from './pages/Finance';
 import CashBook            from './pages/CashBook';
 import FinancialDashboard  from './pages/FinancialDashboard';
 import Settings            from './pages/Settings';
-import AttendanceAdmin     from './pages/AttendanceAdmin';
-import AttendanceCheckIn   from './pages/AttendanceCheckIn';
 import Packages            from './pages/Packages';
 import CreditScore         from './pages/CreditScore';
 import './App.css';
@@ -89,7 +86,6 @@ function App() {
                   <Route path="activity"            element={<LiveActivity />} />
                   <Route path="packages"            element={<Packages />} />
                   <Route path="credit"              element={<CreditScore />} />
-                  <Route path="attendance/checkin"  element={<AttendanceCheckIn />} />
 
                   {/* Admin-only routes */}
                   <Route path="admin"                         element={<AdminOnly><AdminDashboard /></AdminOnly>} />
@@ -97,12 +93,10 @@ function App() {
                   <Route path="admin/users/:userId/access"    element={<AdminOnly><UserVendorAccess /></AdminOnly>} />
                   <Route path="admin/vendors"                 element={<AdminOnly><VendorManagement /></AdminOnly>} />
                   <Route path="admin/manifest"                element={<AdminOnly><AdminManifestOps /></AdminOnly>} />
-                  <Route path="admin/sales-agents"            element={<AdminOnly><SalesAgents /></AdminOnly>} />
                   <Route path="admin/finance"                 element={<AdminOnly><Finance /></AdminOnly>} />
                   <Route path="admin/cashbook"               element={<AdminOnly><CashBook /></AdminOnly>} />
                   <Route path="admin/financial-dashboard"    element={<AdminOnly><FinancialDashboard /></AdminOnly>} />
                   <Route path="admin/settings"              element={<AdminOnly><Settings /></AdminOnly>} />
-                  <Route path="admin/attendance"            element={<AdminOnly><AttendanceAdmin /></AdminOnly>} />
                   <Route path="admin/live"                 element={<AdminOnly><AdminLiveActivity /></AdminOnly>} />
 
                   {/* Reseller routes (admin can also access) */}

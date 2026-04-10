@@ -138,7 +138,7 @@ const LabelHistory: React.FC = () => {
   const fetchLabels = useCallback(async () => {
     setIsLoading(true);
     try {
-      const p = new URLSearchParams({ page: String(page), limit: '15' });
+      const p = new URLSearchParams({ page: String(page), limit: '35' });
       if (carrierF) p.append('carrier',  carrierF);
       if (vendorF)  p.append('vendor',   vendorF);
       if (dateFrom) p.append('dateFrom', dateFrom);
@@ -198,6 +198,15 @@ const LabelHistory: React.FC = () => {
     });
   };
 
+  const trackAll = () => {
+    const ids = labels
+      .filter(l => l.trackingId)
+      .map(l => encodeURIComponent(l.trackingId))
+      .join(',');
+    if (!ids) return;
+    window.open(`https://tools.usps.com/go/TrackConfirmAction?tLabels=${ids}`, '_blank', 'noopener,noreferrer');
+  };
+
   const openPdf = async (label: Label) => {
     const blobUrl = await fetchLabelPdf(label._id);
     if (blobUrl) setViewPdf({ url: blobUrl, trackingId: label.trackingId });
@@ -230,8 +239,8 @@ const LabelHistory: React.FC = () => {
           </div>
         </div>
 
-        {/* Summary pills */}
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {/* Summary pills + Track All */}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 7, background: '#fff', border: '1.5px solid #E2E8F0', borderRadius: 10, padding: '6px 14px' }}>
             <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#6366f1' }} />
             <span style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: 600 }}>Total</span>
@@ -242,6 +251,25 @@ const LabelHistory: React.FC = () => {
             <span style={{ fontSize: '0.72rem', color: '#15803D', fontWeight: 600 }}>Page spend</span>
             <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#15803D' }}>${totalSpent.toFixed(2)}</span>
           </div>
+          <button
+            onClick={trackAll}
+            disabled={labels.filter(l => l.trackingId).length === 0}
+            title="Open all tracking numbers on this page in USPS multi-track"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              height: 36, padding: '0 14px',
+              background: '#EFF6FF', border: '1.5px solid #BFDBFE',
+              borderRadius: 10, color: '#1D4ED8',
+              fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer',
+              transition: 'all 0.15s',
+              opacity: labels.filter(l => l.trackingId).length === 0 ? 0.45 : 1,
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#DBEAFE'; e.currentTarget.style.borderColor = '#93C5FD'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = '#EFF6FF'; e.currentTarget.style.borderColor = '#BFDBFE'; }}
+          >
+            <TruckIcon style={{ width: 14, height: 14 }} />
+            Track All ({labels.filter(l => l.trackingId).length})
+          </button>
         </div>
       </div>
 
@@ -374,7 +402,7 @@ const LabelHistory: React.FC = () => {
               ) : (
                 filtered.map((label, idx) => {
                   const theme    = CC[label.carrier] ?? { bg: '#F8FAFC', color: '#475569', border: '#E2E8F0', accent: '#94A3B8' };
-                  const rowNum   = (page - 1) * 15 + idx + 1;
+                  const rowNum   = (page - 1) * 35 + idx + 1;
                   const isMenuOpen = openAction === label._id;
 
                   return (
@@ -549,7 +577,7 @@ const LabelHistory: React.FC = () => {
         {!isLoading && totalPages > 1 && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', borderTop: '1.5px solid #F1F5F9', background: '#FAFBFC' }}>
             <span style={{ fontSize: '0.72rem', color: '#94A3B8', fontWeight: 500 }}>
-              Showing {(page - 1) * 15 + 1}–{Math.min(page * 15, total)} of <strong style={{ color: '#475569' }}>{total}</strong> labels
+              Showing {(page - 1) * 35 + 1}–{Math.min(page * 35, total)} of <strong style={{ color: '#475569' }}>{total}</strong> labels
             </span>
             <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
               <button

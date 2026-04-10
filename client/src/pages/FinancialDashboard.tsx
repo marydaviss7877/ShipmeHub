@@ -9,17 +9,12 @@ import {
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface KPIs {
   totalRevenuePKR: number; totalRevenueUSD: number;
-  totalVendorCostPKR: number; totalSalaryPKR: number;
+  totalVendorCostPKR: number;
   totalExpensesPKR: number; netProfitPKR: number;
   totalLabels: number; paidLabels: number;
 }
 interface EquityPartner { name: string; ownershipPercent: number; profitSharePKR: number; }
 interface SourceStat { revenueUSD: number; revenuePKR: number; operatingCostPKR: number; profitPKR: number; }
-interface SalesTeamRow {
-  agentId: string; agentName: string; clientCount: number;
-  revenueUSD: number; revenuePKR: number;
-  salaryCostPKR: number; vendorCostPKR: number; netProfitPKR: number;
-}
 interface CarrierCost { carrier: string; labelCount: number; costUSD: number; costPKR: number; sharePercent: string; }
 interface VendorCostRow {
   carrier: string; vendorName: string; labelCount: number;
@@ -31,23 +26,17 @@ interface WalletRow {
   manualCreditsPKR: number; manualDebitsPKR: number; netFlowPKR: number;
 }
 interface ExpenseBreakdownRow { category: string; type: string; totalPKR: number; count: number; }
-interface SalarySummaryRow {
-  agentId: string; agentName: string;
-  baseSalaryPKR: number; totalPaid: number; remainingDue: number;
-}
 interface DashboardData {
   period: { month: number; year: number };
   exchangeRate: number;
   kpis: KPIs;
   equityDistribution: EquityPartner[];
   revenueBySource: { organic: SourceStat; paidAds: SourceStat };
-  salesTeam: SalesTeamRow[];
   carrierCostDistribution: CarrierCost[];
   vendorCostDistribution: VendorCostRow[];
   walletSummary: WalletRow[];
   accountSummary: { totalCreditsPKR: number; totalDebitsPKR: number; netFlowPKR: number };
   expenseBreakdown: ExpenseBreakdownRow[];
-  salarySummary: SalarySummaryRow[];
 }
 interface PartnerRecord { _id: string; name: string; ownershipPercent: number; isActive: boolean; }
 
@@ -95,7 +84,6 @@ const PLBar: React.FC<{ kpis: KPIs }> = ({ kpis }) => {
   const profit = kpis.netProfitPKR;
   const segments = [
     { label: 'Vendor Cost',  value: kpis.totalVendorCostPKR,  color: '#ef4444' },
-    { label: 'Salaries',     value: kpis.totalSalaryPKR,       color: '#f59e0b' },
     { label: 'Expenses',     value: kpis.totalExpensesPKR,     color: '#f97316' },
     { label: profit >= 0 ? 'Net Profit' : 'Net Loss', value: Math.abs(profit), color: profit >= 0 ? '#22c55e' : '#dc2626' },
   ];
@@ -187,7 +175,7 @@ const FinancialDashboard: React.FC = () => {
   const fetchPartners = useCallback(async () => {
     try {
       const { data: d } = await axios.get('/equity-partners');
-      setPartners(d.partners || []);
+      setPartners(Array.isArray(d) ? d : []);
     } catch {}
   }, []);
 
@@ -242,13 +230,12 @@ const FinancialDashboard: React.FC = () => {
   );
 
   const {
-    kpis, equityDistribution, revenueBySource, salesTeam, carrierCostDistribution,
-    vendorCostDistribution, walletSummary, accountSummary, expenseBreakdown, salarySummary,
+    kpis, equityDistribution, revenueBySource, carrierCostDistribution,
+    vendorCostDistribution, walletSummary, accountSummary, expenseBreakdown,
   } = data;
 
-  const netPositive     = kpis.netProfitPKR >= 0;
-  const maxExpense      = expenseBreakdown[0]?.totalPKR || 1;
-  const maxAgentRevPKR  = Math.max(...salesTeam.map(a => a.revenuePKR), 1);
+  const netPositive = kpis.netProfitPKR >= 0;
+  const maxExpense  = expenseBreakdown[0]?.totalPKR || 1;
 
   // Pie data for carriers
   const carrierPieData = carrierCostDistribution.map(c => ({
@@ -295,7 +282,6 @@ const FinancialDashboard: React.FC = () => {
         <KpiTile label="Total Labels"    value={kpis.totalLabels.toLocaleString()} accent="#1d4ed8" bg="#eff6ff" border="#bfdbfe" />
         <KpiTile label="Paid Labels Est" value={kpis.paidLabels.toLocaleString()}  accent="#4338ca" bg="#eef2ff" border="#c7d2fe" />
         <KpiTile label="Vendor Cost"     value={fmtPKR(kpis.totalVendorCostPKR)}  accent="#dc2626" bg="#fff1f2" border="#fecdd3" />
-        <KpiTile label="Salaries"        value={fmtPKR(kpis.totalSalaryPKR)}      accent="#b45309" bg="#fffbeb" border="#fde68a" />
         <KpiTile label="Other Expenses"  value={fmtPKR(kpis.totalExpensesPKR)}    accent="#c2410c" bg="#fff7ed" border="#fed7aa" />
       </div>
 
@@ -335,7 +321,7 @@ const FinancialDashboard: React.FC = () => {
           <SectionLabel>Revenue by Source</SectionLabel>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
             {([
-              { key: 'organic', label: 'Organic',  color: '#15803d', bg: '#f0fdf4', border: '#bbf7d0', costLabel: 'Salary Cost' },
+              { key: 'organic', label: 'Organic',  color: '#15803d', bg: '#f0fdf4', border: '#bbf7d0', costLabel: 'Ad Spend' },
               { key: 'paidAds', label: 'Paid Ads', color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe', costLabel: 'Ad Spend' },
             ] as const).map(({ key, label, color, bg, border, costLabel }) => {
               const s = revenueBySource[key];
@@ -462,78 +448,6 @@ const FinancialDashboard: React.FC = () => {
           )}
         </Card>
       </div>
-
-      {/* ── Sales Team + Salary Summary ────────────────────────────────────── */}
-      {(salesTeam.length > 0 || salarySummary.length > 0) && (
-        <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: '0.875rem' }}>
-
-          {/* Sales Team */}
-          {salesTeam.length > 0 && (
-            <Card>
-              <SectionLabel>Sales Team Performance</SectionLabel>
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr>
-                      {['Agent','Clients','Revenue','Salary','Vendor','Net'].map(h => (
-                        <th key={h} style={{ padding: '0.375rem 0.625rem', textAlign: h === 'Agent' ? 'left' : 'right', fontSize: '0.62rem', fontWeight: 700, color: 'var(--navy-500)', letterSpacing: '0.05em', textTransform: 'uppercase', background: 'var(--navy-25)', borderBottom: '1px solid var(--navy-100)', whiteSpace: 'nowrap' }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {salesTeam.map((a, i) => (
-                      <tr key={a.agentId} style={{ borderBottom: i < salesTeam.length - 1 ? '1px solid var(--navy-50)' : 'none' }}>
-                        <td style={{ padding: '0.4rem 0.625rem' }}>
-                          <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--navy-800)' }}>{a.agentName}</div>
-                          {/* Mini revenue bar */}
-                          <div style={{ height: 3, background: 'var(--navy-100)', borderRadius: 2, marginTop: 3, width: 80, overflow: 'hidden' }}>
-                            <div style={{ height: '100%', width: `${(a.revenuePKR / maxAgentRevPKR) * 100}%`, background: '#22c55e', borderRadius: 2 }} />
-                          </div>
-                        </td>
-                        <td style={{ padding: '0.4rem 0.625rem', textAlign: 'right', fontSize: '0.78rem', color: 'var(--navy-600)' }}>{a.clientCount}</td>
-                        <td style={{ padding: '0.4rem 0.625rem', textAlign: 'right', fontSize: '0.78rem', fontWeight: 600, color: '#15803d', whiteSpace: 'nowrap' }}>{fmtPKR(a.revenuePKR)}</td>
-                        <td style={{ padding: '0.4rem 0.625rem', textAlign: 'right', fontSize: '0.78rem', color: '#b45309', whiteSpace: 'nowrap' }}>{fmtPKR(a.salaryCostPKR)}</td>
-                        <td style={{ padding: '0.4rem 0.625rem', textAlign: 'right', fontSize: '0.78rem', color: '#dc2626', whiteSpace: 'nowrap' }}>{fmtPKR(a.vendorCostPKR)}</td>
-                        <td style={{ padding: '0.4rem 0.625rem', textAlign: 'right', fontSize: '0.82rem', fontWeight: 700, color: a.netProfitPKR >= 0 ? '#15803d' : '#dc2626', whiteSpace: 'nowrap' }}>{fmtPKR(a.netProfitPKR)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
-          )}
-
-          {/* Salary Summary */}
-          {salarySummary.length > 0 && (
-            <Card>
-              <SectionLabel>Salary Summary</SectionLabel>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {salarySummary.map(a => {
-                  const paidPct = a.baseSalaryPKR > 0 ? Math.min((a.totalPaid / a.baseSalaryPKR) * 100, 100) : 100;
-                  return (
-                    <div key={a.agentId}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
-                        <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--navy-800)' }}>{a.agentName}</span>
-                        {a.remainingDue > 0
-                          ? <span style={{ fontSize: '0.65rem', background: '#fee2e2', color: '#dc2626', padding: '1px 6px', borderRadius: 10, fontWeight: 700 }}>Due {fmtPKR(a.remainingDue)}</span>
-                          : <span style={{ fontSize: '0.65rem', background: '#dcfce7', color: '#15803d', padding: '1px 6px', borderRadius: 10, fontWeight: 700 }}>Paid ✓</span>
-                        }
-                      </div>
-                      <div style={{ height: 7, background: 'var(--navy-100)', borderRadius: 4, overflow: 'hidden' }}>
-                        <div style={{ height: '100%', width: `${paidPct}%`, background: paidPct === 100 ? '#22c55e' : '#f59e0b', borderRadius: 4, transition: 'width 0.4s ease' }} />
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
-                        <span style={{ fontSize: '0.65rem', color: 'var(--navy-500)' }}>Paid: {fmtPKR(a.totalPaid)}</span>
-                        <span style={{ fontSize: '0.65rem', color: 'var(--navy-400)' }}>Base: {fmtPKR(a.baseSalaryPKR)}</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </Card>
-          )}
-        </div>
-      )}
 
       {/* ── Equity Distribution + Wallet Summary ───────────────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: equityDistribution.length > 0 && walletSummary.length > 0 ? '1fr 2fr' : '1fr', gap: '0.875rem' }}>

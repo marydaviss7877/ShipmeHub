@@ -100,10 +100,10 @@ const UserManagement: React.FC = () => {
   const [actionAmt,    setActionAmt]    = useState('');
   const [actionDesc,   setActionDesc]   = useState('');
   const [processingBal,setProcessingBal]= useState(false);
+  const [showAllTx,    setShowAllTx]    = useState(false);
 
   // ── Wallets ──────────────────────────────────────────────────
   const [wallets,           setWallets]          = useState<Wallet[]>([]);
-  const [isSalesAgentClient,setIsSalesAgentClient] = useState(false);
 
   // ── Payment logs ─────────────────────────────────────────────
   const [payLogs,       setPayLogs]      = useState<PaymentLog[]>([]);
@@ -197,7 +197,6 @@ const UserManagement: React.FC = () => {
       if (fetchingForRef.current !== id) return;
       setPayLogs(res.data.logs || []);
       setTotalPaid(res.data.totalPaid || 0);
-      setIsSalesAgentClient(res.data.isSalesAgentClient || false);
     } catch {}
   };
 
@@ -222,7 +221,6 @@ const UserManagement: React.FC = () => {
       fd.append('amount', payAmt);
       fd.append('date', payDate);
       fd.append('note', payNote);
-      if (isSalesAgentClient) fd.append('walletId', payWallet);
       payFiles.forEach(f => fd.append('screenshots', f));
       payRemove.forEach(u => fd.append('removeScreenshots', u));
       if (editPayLog) {
@@ -266,6 +264,7 @@ const UserManagement: React.FC = () => {
     setBalAction('');
     setShowPayForm(false);
     setBalance(null);   // clear stale balance so old user's data doesn't flash
+    setShowAllTx(false);
     setPayLogs([]);
     setTotalPaid(0);
   };
@@ -723,28 +722,40 @@ const UserManagement: React.FC = () => {
 
                       {/* Transactions */}
                       <div>
-                        <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--navy-400)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '0.375rem' }}>
-                          Recent Transactions
+                        <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--navy-400)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '0.375rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span>Transactions {balance?.recentTransactions?.length ? `(${balance.recentTransactions.length})` : ''}</span>
+                          {(balance?.recentTransactions?.length ?? 0) > 5 && (
+                            <button
+                              className="btn btn-ghost btn-sm"
+                              style={{ fontSize: '0.65rem', padding: '2px 7px' }}
+                              onClick={() => setShowAllTx(v => !v)}
+                            >
+                              {showAllTx ? 'Show less' : `Show all ${balance!.recentTransactions.length}`}
+                            </button>
+                          )}
                         </div>
                         {!balance?.recentTransactions?.length ? (
                           <p style={{ fontSize: '0.8rem', color: 'var(--navy-400)' }}>No transactions yet.</p>
-                        ) : balance.recentTransactions.slice(0, 8).map((tx, i) => (
-                          <div key={i} style={{
-                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                            padding: '0.4rem 0', borderBottom: i < 7 ? '1px solid var(--navy-50)' : 'none',
-                          }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                              <span className={`status-dot ${txDot(tx.type)}`} />
-                              <div>
-                                <div style={{ fontSize: '0.75rem', color: 'var(--navy-800)' }}>{tx.description}</div>
-                                <div style={{ fontSize: '0.68rem', color: 'var(--navy-400)' }}>{new Date(tx.createdAt).toLocaleDateString()}</div>
+                        ) : (() => {
+                          const txList = showAllTx ? balance.recentTransactions : balance.recentTransactions.slice(0, 5);
+                          return txList.map((tx, i) => (
+                            <div key={i} style={{
+                              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                              padding: '0.4rem 0', borderBottom: i < txList.length - 1 ? '1px solid var(--navy-50)' : 'none',
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                                <span className={`status-dot ${txDot(tx.type)}`} />
+                                <div>
+                                  <div style={{ fontSize: '0.75rem', color: 'var(--navy-800)' }}>{tx.description}</div>
+                                  <div style={{ fontSize: '0.68rem', color: 'var(--navy-400)' }}>{new Date(tx.createdAt).toLocaleDateString()}</div>
+                                </div>
                               </div>
+                              <span style={{ fontSize: '0.78rem', fontWeight: 700, color: txColor(tx.type) }}>
+                                {tx.type === 'deduction' ? '−' : '+'}{fmt(tx.amount)}
+                              </span>
                             </div>
-                            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: txColor(tx.type) }}>
-                              {tx.type === 'deduction' ? '−' : '+'}{fmt(tx.amount)}
-                            </span>
-                          </div>
-                        ))}
+                          ));
+                        })()}
                       </div>
 
                       {/* ── Payment Log ── */}
@@ -786,18 +797,6 @@ const UserManagement: React.FC = () => {
                               <input type="text" className="form-input"
                                 value={payNote} onChange={e => setPayNote(e.target.value)} placeholder="Wire, receipt #…" />
                             </div>
-                            {isSalesAgentClient && (
-                              <div>
-                                <label className="form-label">Wallet</label>
-                                <select className="form-input" value={payWallet} onChange={e => setPayWallet(e.target.value)}>
-                                  <option value="">— Select wallet —</option>
-                                  {wallets.filter(w => w.isActive).map(w => (
-                                    <option key={w._id} value={w._id}>{w.name}</option>
-                                  ))}
-                                </select>
-                              </div>
-                            )}
-
                             {/* Existing screenshots (edit) */}
                             {editPayLog && editPayLog.screenshots.filter(s => !payRemove.includes(s)).length > 0 && (
                               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>

@@ -33,7 +33,7 @@ router.get('/', authenticateToken, async (req, res) => {
     const recentTransactions = txns
       .slice()
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-      .slice(0, 10);
+      .slice(0, 50);
 
     res.json({
       balance: {
@@ -41,7 +41,8 @@ router.get('/', authenticateToken, async (req, res) => {
         totalDeposited,
         totalSpent,
         totalDistributed,
-        recentTransactions
+        recentTransactions,
+        totalTransactions: txns.length
       }
     });
   } catch (error) {
@@ -97,12 +98,12 @@ router.get('/:userId', authenticateToken, async (req, res) => {
     }
 
     const balance = await Balance.getOrCreateBalance(userId);
-    const recentTransactions = balance.transactions
+    const allSorted = balance.transactions
       .slice()
-      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-      .slice(0, 10);
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    const recentTransactions = allSorted.slice(0, 50);
 
-    res.json({ currentBalance: balance.currentBalance, recentTransactions });
+    res.json({ currentBalance: balance.currentBalance, recentTransactions, totalTransactions: allSorted.length });
   } catch (error) {
     console.error('Get balance by userId error:', error);
     res.status(500).json({ message: 'Server error getting balance' });

@@ -24,7 +24,6 @@ import {
   BellIcon,
   MegaphoneIcon,
   Cog6ToothIcon,
-  ClockIcon,
   CreditCardIcon,
   GiftIcon,
 } from '@heroicons/react/24/outline';
@@ -73,7 +72,7 @@ const Layout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen]   = useState(false);
   const [collapsed, setCollapsed]       = useState(() => localStorage.getItem(COLLAPSED_KEY) === '1');
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
-    overview: true, labels: true, management: true, account: true,
+    overview: true, labels: true, operations: true, finance: true, management: true, account: true,
   });
   const [tooltip, setTooltip] = useState<{ name: string; y: number } | null>(null);
   const tooltipTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -177,50 +176,59 @@ const Layout: React.FC = () => {
 
   // ── Navigation definitions ──────────────────────────────────────────────
   const overviewNav: NavItem[] = [
-    { name: 'Dashboard',      href: '/dashboard',      icon: HomeIcon,        current: location.pathname === '/dashboard' },
-    { name: 'Announcements',  href: '/announcements',  icon: MegaphoneIcon,   current: location.pathname === '/announcements' },
-    { name: 'Live Activity',  href: '/activity',       icon: SignalIcon,      current: location.pathname === '/activity'  },
-    { name: 'Packages',       href: '/packages',       icon: GiftIcon,        current: location.pathname === '/packages' },
-    { name: 'Credit Score',   href: '/credit',         icon: CreditCardIcon,  current: location.pathname === '/credit' },
+    { name: 'Dashboard',     href: '/dashboard',     icon: HomeIcon,      current: location.pathname === '/dashboard' },
+    { name: 'Announcements', href: '/announcements', icon: MegaphoneIcon, current: location.pathname === '/announcements' },
+    { name: 'Live Activity', href: '/activity',      icon: SignalIcon,    current: location.pathname === '/activity' },
   ];
 
   const labelsNav: NavItem[] = [
-    { name: 'Single Label',      href: '/labels/single',       icon: TagIcon,                   current: location.pathname === '/labels/single' },
-    { name: 'Bulk Labels',       href: '/labels/bulk',          icon: RectangleStackIcon,        current: location.pathname === '/labels/bulk' },
-    { name: 'Single History',    href: '/labels/history',      icon: ClipboardDocumentListIcon, current: location.pathname === '/labels/history' },
-    { name: 'Bulk History',      href: '/labels/bulk-history', icon: ClipboardDocumentListIcon, current: location.pathname === '/labels/bulk-history' },
-    { name: 'Manifest History',  href: '/manifest/history',    icon: Squares2X2Icon,            current: location.pathname === '/manifest/history' },
+    { name: 'Single Label',     href: '/labels/single',       icon: TagIcon,                   current: location.pathname === '/labels/single' },
+    { name: 'Bulk Labels',      href: '/labels/bulk',          icon: RectangleStackIcon,        current: location.pathname === '/labels/bulk' },
+    { name: 'Single History',   href: '/labels/history',      icon: ClipboardDocumentListIcon, current: location.pathname === '/labels/history' },
+    { name: 'Bulk History',     href: '/labels/bulk-history', icon: ClipboardDocumentListIcon, current: location.pathname === '/labels/bulk-history' },
+    { name: 'Manifest History', href: '/manifest/history',    icon: Squares2X2Icon,            current: location.pathname === '/manifest/history' },
   ];
 
-  const adminItems: NavItem[] = user?.role === 'admin' ? [
-    { name: 'Admin Panel',         href: '/admin',                     icon: UserGroupIcon,             current: location.pathname === '/admin' },
-    { name: 'Users',               href: '/admin/users',               icon: UserGroupIcon,             current: location.pathname.startsWith('/admin/users') },
-    { name: 'Vendors',             href: '/admin/vendors',             icon: BuildingStorefrontIcon,    current: location.pathname === '/admin/vendors' },
-    { name: 'Manifest Ops',        href: '/admin/manifest',            icon: Squares2X2Icon,            current: location.pathname === '/admin/manifest' },
-    { name: 'Sales Team',          href: '/admin/sales-agents',        icon: UserGroupIcon,             current: location.pathname === '/admin/sales-agents' },
-    { name: 'Finance',             href: '/admin/finance',             icon: BanknotesIcon,             current: location.pathname === '/admin/finance' },
-    { name: 'Cash Book',           href: '/admin/cashbook',            icon: BookOpenIcon,              current: location.pathname === '/admin/cashbook' },
-    { name: 'Financial Dashboard', href: '/admin/financial-dashboard', icon: PresentationChartLineIcon, current: location.pathname === '/admin/financial-dashboard' },
-    { name: 'Settings',            href: '/admin/settings',            icon: Cog6ToothIcon,               current: location.pathname === '/admin/settings' },
-    { name: 'Attendance',          href: '/admin/attendance',          icon: ClockIcon,                   current: location.pathname === '/admin/attendance' },
-    { name: 'Live Monitor',        href: '/admin/live',                icon: SignalIcon,                   current: location.pathname === '/admin/live' },
+  // Admin — Operations
+  const adminOpsItems: NavItem[] = user?.role === 'admin' ? [
+    { name: 'Live Monitor', href: '/admin/live',     icon: SignalIcon,     current: location.pathname === '/admin/live' },
+    { name: 'Manifest Ops', href: '/admin/manifest', icon: Squares2X2Icon, current: location.pathname === '/admin/manifest' },
+  ] : [];
+
+  // Admin — Finance
+  const adminFinanceItems: NavItem[] = user?.role === 'admin' ? [
+    { name: 'Finance',           href: '/admin/finance',             icon: BanknotesIcon,             current: location.pathname === '/admin/finance' },
+    { name: 'Cash Book',         href: '/admin/cashbook',            icon: BookOpenIcon,              current: location.pathname === '/admin/cashbook' },
+    { name: 'Fin. Dashboard',    href: '/admin/financial-dashboard', icon: PresentationChartLineIcon, current: location.pathname === '/admin/financial-dashboard' },
+  ] : [];
+
+  // Admin — Management | Reseller — Clients
+  const mgmtItems: NavItem[] = user?.role === 'admin' ? [
+    { name: 'Admin Panel', href: '/admin',              icon: Squares2X2Icon,         current: location.pathname === '/admin' },
+    { name: 'Users',       href: '/admin/users',        icon: UserGroupIcon,          current: location.pathname.startsWith('/admin/users') },
+    { name: 'Vendors',     href: '/admin/vendors',      icon: BuildingStorefrontIcon, current: location.pathname === '/admin/vendors' },
+    { name: 'Settings',    href: '/admin/settings',     icon: Cog6ToothIcon,          current: location.pathname === '/admin/settings' },
   ] : user?.role === 'reseller' ? [
     { name: 'My Clients', href: '/reseller/clients', icon: UserGroupIcon, current: location.pathname.startsWith('/reseller/clients') },
     { name: 'Finance',    href: '/reseller/finance', icon: BanknotesIcon, current: location.pathname === '/reseller/finance' },
   ] : [];
 
   const accountNav: NavItem[] = [
-    { name: 'Profile', href: '/profile', icon: UserIcon, current: location.pathname === '/profile' },
+    { name: 'Packages',    href: '/packages', icon: GiftIcon,       current: location.pathname === '/packages' },
+    { name: 'Credit Score',href: '/credit',   icon: CreditCardIcon, current: location.pathname === '/credit' },
+    { name: 'Profile',     href: '/profile',  icon: UserIcon,       current: location.pathname === '/profile' },
   ];
 
   const sections: NavSection[] = [
-    { key: 'overview',    label: 'Overview',    items: overviewNav  },
-    { key: 'labels',      label: 'Labels',      items: labelsNav    },
-    ...(adminItems.length > 0 ? [{ key: 'management', label: 'Management', items: adminItems }] : []),
-    { key: 'account',     label: 'Account',     items: accountNav   },
+    { key: 'overview',    label: 'Overview',    items: overviewNav },
+    { key: 'labels',      label: 'Labels',      items: labelsNav },
+    ...(adminOpsItems.length > 0     ? [{ key: 'operations', label: 'Operations',  items: adminOpsItems }]     : []),
+    ...(adminFinanceItems.length > 0 ? [{ key: 'finance',    label: 'Finance',     items: adminFinanceItems }] : []),
+    ...(mgmtItems.length > 0         ? [{ key: 'management', label: user?.role === 'reseller' ? 'Clients' : 'Management', items: mgmtItems }] : []),
+    { key: 'account',     label: 'Account',     items: accountNav },
   ];
 
-  const allNav    = [...overviewNav, ...labelsNav, ...adminItems, ...accountNav];
+  const allNav = [...overviewNav, ...labelsNav, ...adminOpsItems, ...adminFinanceItems, ...mgmtItems, ...accountNav];
   const activePage = allNav.find(n => n.current);
   const activeSection = sections.find(s => s.items.some(i => i.name === activePage?.name));
   const initials  = `${user?.firstName?.charAt(0) ?? ''}${user?.lastName?.charAt(0) ?? ''}`;

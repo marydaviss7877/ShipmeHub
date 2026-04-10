@@ -6,41 +6,27 @@ import axios from 'axios';
 // ── Interfaces ────────────────────────────────────────────────────────────────
 
 interface FinanceRow {
-  clientId:        string;
-  clientName:      string;
-  clientEmail:     string;
-  carrier:         string;
-  monthLabels:     number;
-  paidLabels:      number;
-  unpaidLabels:    number;
-  clientRate:      number;
-  totalAmountUSD:  number;
-  paidByClientUSD: number;
-  differenceUSD:   number;
-  vendorCostUSD?:  number;
-  profitUSD?:      number;
-  status:          string;
-  note:            string;
-  statusId:        string | null;
-  spInitials?:     string;
-  source?:         string;
+  clientId:    string;
+  clientName:  string;
+  clientEmail: string;
+  carrier:     string;
+  labelCount:  number;
+  totalAmount: number;
+  collected:   number;
+  difference:  number;
+  usdCost:     number | null;
+  status:      string;
+  note:        string;
+  statusId:    string | null;
+  source?:     string;
 }
 
 interface Summary {
-  totalLabels:     number;
-  paidLabels:      number;
-  unpaidLabels:    number;
-  totalAmountUSD:  number;
-  paidByClientUSD: number;
-  differenceUSD:   number;
-  vendorCostUSD?:  number;
-  profitUSD?:      number;
-}
-
-interface VendorCostRow {
-  carrier:         string;
-  vendorName:      string | null;
-  costPerLabelUSD: number;
+  totalLabels:  number;
+  totalAmount:  number;
+  collected:    number;
+  difference:   number;
+  totalUsdCost?: number;
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -62,8 +48,6 @@ const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-const fmtN = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 1 });
 
 const CarrierBadge: React.FC<{ carrier: string }> = ({ carrier }) => {
   const styles: Record<string, React.CSSProperties> = {
@@ -97,27 +81,20 @@ const Finance: React.FC = () => {
   const [selectedYear,  setSelectedYear]  = useState(now.getFullYear());
 
   // ── Data state
-  const [rows,         setRows]         = useState<FinanceRow[]>([]);
-  const [summary,      setSummary]      = useState<Summary | null>(null);
-  const [, setUsdToPkr] = useState<number>(280);
-  const [loading,      setLoading]      = useState(true);
+  const [rows,    setRows]    = useState<FinanceRow[]>([]);
+  const [summary, setSummary] = useState<Summary | null>(null);
+  const [loading, setLoading] = useState(true);
 
   // ── Filters
-  const [searchTerm,     setSearchTerm]     = useState('');
-  const [carrierFilter,  setCarrierFilter]  = useState('');
-  const [statusFilter,   setStatusFilter]   = useState('');
+  const [searchTerm,    setSearchTerm]    = useState('');
+  const [carrierFilter, setCarrierFilter] = useState('');
+  const [statusFilter,  setStatusFilter]  = useState('');
 
   // ── Inline status editing
-  const [editingRow,   setEditingRow]   = useState<string | null>(null); // `clientId_carrier`
-  const [editStatus,   setEditStatus]   = useState('');
-  const [editNote,     setEditNote]     = useState('');
-  const [savingRow,    setSavingRow]    = useState(false);
-
-  // ── Vendor cost modal (admin only)
-  const [showVcModal,   setShowVcModal]   = useState(false);
-  const [vcRows,        setVcRows]        = useState<VendorCostRow[]>([]);
-  const [manifestVendors, setManifestVendors] = useState<Record<string, string[]>>({});
-  const [savingVc,      setSavingVc]      = useState(false);
+  const [editingRow, setEditingRow] = useState<string | null>(null); // `clientId_carrier`
+  const [editStatus, setEditStatus] = useState('');
+  const [editNote,   setEditNote]   = useState('');
+  const [savingRow,  setSavingRow]  = useState(false);
 
   // ── CSV export
   const [exporting, setExporting] = useState(false);
@@ -133,7 +110,6 @@ const Finance: React.FC = () => {
       });
       setRows(data.rows || []);
       setSummary(data.summary || null);
-      if (data.usdToPkrRate) setUsdToPkr(data.usdToPkrRate);
     } catch (err) {
       console.error('Failed to load finance data', err);
     } finally {
@@ -142,24 +118,6 @@ const Finance: React.FC = () => {
   }, [selectedMonth, selectedYear, isAdmin]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
-
-  const openVcModal = async () => {
-    setShowVcModal(true);
-    try {
-      const [costsRes, vendorsRes] = await Promise.all([
-        axios.get('/finance/vendor-costs', { params: { month: selectedMonth, year: selectedYear } }),
-        axios.get('/finance/manifest-vendors'),
-      ]);
-      setVcRows(costsRes.data.map((c: any) => ({
-        carrier:         c.carrier,
-        vendorName:      c.vendorName || null,
-        costPerLabelUSD: c.costPerLabelUSD,
-      })));
-      setManifestVendors(vendorsRes.data || {});
-    } catch (err) {
-      console.error('Failed to load vendor costs', err);
-    }
-  };
 
   // ── Month navigation ───────────────────────────────────────────────────────
 
@@ -175,8 +133,7 @@ const Finance: React.FC = () => {
   // ── Status edit actions ────────────────────────────────────────────────────
 
   const startEdit = (row: FinanceRow) => {
-    const key = `${row.clientId}_${row.carrier}`;
-    setEditingRow(key);
+    setEditingRow(`${row.clientId}_${row.carrier}`);
     setEditStatus(row.status);
     setEditNote(row.note);
   };
@@ -204,33 +161,6 @@ const Finance: React.FC = () => {
       alert(err.response?.data?.message || 'Failed to save');
     } finally {
       setSavingRow(false);
-    }
-  };
-
-  // ── Vendor cost actions ────────────────────────────────────────────────────
-
-  const addVcRow = (carrier: string, vendorName: string | null) => {
-    setVcRows(rows => [...rows, { carrier, vendorName, costPerLabelUSD: 0 }]);
-  };
-
-  const removeVcRow = (i: number) => {
-    setVcRows(rows => rows.filter((_, idx) => idx !== i));
-  };
-
-  const saveVendorCosts = async () => {
-    setSavingVc(true);
-    try {
-      await axios.put('/finance/vendor-costs', {
-        month:  selectedMonth,
-        year:   selectedYear,
-        costs:  vcRows,
-      });
-      setShowVcModal(false);
-      fetchData(); // Refresh profit columns
-    } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to save vendor costs');
-    } finally {
-      setSavingVc(false);
     }
   };
 
@@ -275,12 +205,6 @@ const Finance: React.FC = () => {
     return <Navigate to="/dashboard" replace />;
   }
 
-  // ── Vendor Cost Modal ──────────────────────────────────────────────────────
-
-  // Pre-built USPS row (ShippersHub, cumulative)
-  const uspsVcRow  = vcRows.find(r => r.carrier === 'USPS' && !r.vendorName);
-  const otherVcRows = vcRows.filter(r => !(r.carrier === 'USPS' && !r.vendorName));
-
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
@@ -309,11 +233,6 @@ const Finance: React.FC = () => {
           </div>
 
           {isAdmin && (
-            <button className="btn btn-ghost btn-sm" onClick={openVcModal}>
-              &#36; Vendor Costs
-            </button>
-          )}
-          {isAdmin && (
             <button className="btn btn-ghost btn-sm" onClick={handleExport} disabled={exporting}>
               {exporting ? 'Exporting…' : '↓ Export CSV'}
             </button>
@@ -324,30 +243,16 @@ const Finance: React.FC = () => {
       {/* ── KPI Summary Cards ─────────────────────────────────────────────── */}
       {summary && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem' }}>
-          <KpiCard label="Total Labels"   value={fmtN(summary.totalLabels)}   color="indigo" />
-          <KpiCard label="Paid Labels"    value={fmtN(summary.paidLabels)}    color="green" />
-          <KpiCard
-            label="Unpaid Labels"
-            value={fmtN(summary.unpaidLabels)}
-            color={summary.unpaidLabels > 0 ? 'amber' : 'green'}
-          />
-          <KpiCard label="Total Revenue"    value={`$${summary.totalAmountUSD.toFixed(0)}`}  color="indigo" />
-          <KpiCard
-            label="Collected"
-            value={`$${summary.paidByClientUSD.toFixed(0)}`}
-            color="green"
-          />
+          <KpiCard label="Total Labels"  value={summary.totalLabels.toLocaleString()} color="indigo" />
+          <KpiCard label="Total Revenue" value={`$${summary.totalAmount.toFixed(2)}`} color="indigo" />
+          <KpiCard label="Collected"     value={`$${summary.collected.toFixed(2)}`}   color="green" />
           <KpiCard
             label="Outstanding"
-            value={`$${Math.abs(summary.differenceUSD).toFixed(0)}`}
-            color={summary.differenceUSD < -0.01 ? 'amber' : 'green'}
+            value={`$${Math.abs(summary.difference).toFixed(2)}`}
+            color={summary.difference > 0.01 ? 'amber' : 'green'}
           />
-          {isAdmin && summary.profitUSD !== undefined && (
-            <KpiCard
-              label="Net Profit"
-              value={`$${summary.profitUSD.toFixed(0)}`}
-              color={(summary.profitUSD ?? 0) >= 0 ? 'green' : 'red'}
-            />
+          {isAdmin && summary.totalUsdCost !== undefined && (
+            <KpiCard label="USPS Cost" value={`$${summary.totalUsdCost.toFixed(2)}`} color="indigo" />
           )}
         </div>
       )}
@@ -409,19 +314,14 @@ const Finance: React.FC = () => {
               <thead>
                 <tr>
                   {isAdmin && <th>Source</th>}
-                  {isAdmin && <th>S P</th>}
                   <th>Client</th>
                   <th>Carrier</th>
-                  <th style={{ textAlign: 'right' }}>Total Labels</th>
-                  <th style={{ textAlign: 'right' }}>Paid</th>
-                  <th style={{ textAlign: 'right' }}>Unpaid</th>
+                  <th style={{ textAlign: 'right' }}>Labels</th>
                   <th>Status</th>
-                  <th style={{ textAlign: 'right' }}>Rate</th>
                   <th style={{ textAlign: 'right' }}>Total ($)</th>
                   <th style={{ textAlign: 'right' }}>Collected ($)</th>
                   <th style={{ textAlign: 'right' }}>Diff ($)</th>
-                  {isAdmin && <th style={{ textAlign: 'right' }}>Vendor Cost</th>}
-                  {isAdmin && <th style={{ textAlign: 'right' }}>Profit</th>}
+                  {isAdmin && <th style={{ textAlign: 'right' }}>USPS Cost</th>}
                   <th>Note</th>
                   {isAdmin && <th></th>}
                 </tr>
@@ -431,10 +331,10 @@ const Finance: React.FC = () => {
                   const rowKey    = `${row.clientId}_${row.carrier}`;
                   const isEditing = editingRow === rowKey;
                   const sstyle    = STATUS_STYLE[row.status] || STATUS_STYLE['Pending'];
-                  const isPaid    = row.unpaidLabels <= 0.05;
+                  const hasDebt   = row.difference > 0.01;
 
                   return (
-                    <tr key={rowKey} style={!isPaid && row.unpaidLabels > 50 ? { background: '#FFFBEB' } : {}}>
+                    <tr key={rowKey} style={hasDebt && row.difference > 50 ? { background: '#FFFBEB' } : {}}>
                       {isAdmin && (
                         <td>
                           {row.source ? (
@@ -444,25 +344,12 @@ const Finance: React.FC = () => {
                           )}
                         </td>
                       )}
-                      {isAdmin && (
-                        <td>
-                          {row.spInitials ? (
-                            <span style={{ fontWeight: 700, fontSize: '0.8rem', color: 'var(--accent-700)' }}>{row.spInitials}</span>
-                          ) : (
-                            <span style={{ color: 'var(--navy-300)' }}>—</span>
-                          )}
-                        </td>
-                      )}
                       <td>
                         <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{row.clientName}</div>
                         <div style={{ fontSize: '0.72rem', color: 'var(--navy-500)' }}>{row.clientEmail}</div>
                       </td>
                       <td><CarrierBadge carrier={row.carrier} /></td>
-                      <td style={{ textAlign: 'right', fontWeight: 600 }}>{row.monthLabels.toLocaleString()}</td>
-                      <td style={{ textAlign: 'right', color: 'var(--success-600)', fontWeight: 500 }}>{fmtN(row.paidLabels)}</td>
-                      <td style={{ textAlign: 'right', color: row.unpaidLabels > 0.05 ? 'var(--warning-600)' : 'var(--success-600)', fontWeight: 600 }}>
-                        {fmtN(row.unpaidLabels)}
-                      </td>
+                      <td style={{ textAlign: 'right', fontWeight: 600 }}>{row.labelCount.toLocaleString()}</td>
                       <td>
                         {isEditing ? (
                           <select
@@ -484,22 +371,18 @@ const Finance: React.FC = () => {
                           </span>
                         )}
                       </td>
-                      <td style={{ textAlign: 'right', fontSize: '0.85rem' }}>${row.clientRate.toFixed(3)}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 500 }}>${row.totalAmountUSD.toFixed(2)}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 500, color: 'var(--success-600)' }}>${row.paidByClientUSD.toFixed(2)}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 600, color: row.differenceUSD < -0.01 ? 'var(--danger-600)' : 'var(--success-600)' }}>
-                        {row.differenceUSD < -0.01
-                          ? `-$${Math.abs(row.differenceUSD).toFixed(2)}`
-                          : `+$${row.differenceUSD.toFixed(2)}`}
+                      <td style={{ textAlign: 'right', fontWeight: 500 }}>${row.totalAmount.toFixed(2)}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 500, color: 'var(--success-600)' }}>${row.collected.toFixed(2)}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 600, color: hasDebt ? 'var(--danger-600)' : 'var(--success-600)' }}>
+                        {hasDebt
+                          ? `-$${row.difference.toFixed(2)}`
+                          : `+$${Math.abs(row.difference).toFixed(2)}`}
                       </td>
                       {isAdmin && (
                         <td style={{ textAlign: 'right', color: 'var(--navy-500)', fontSize: '0.85rem' }}>
-                          {row.vendorCostUSD! > 0 ? `$${row.vendorCostUSD!.toFixed(2)}` : <span style={{ color: 'var(--navy-300)' }}>—</span>}
-                        </td>
-                      )}
-                      {isAdmin && (
-                        <td style={{ textAlign: 'right', fontWeight: 600, color: (row.profitUSD ?? 0) >= 0 ? 'var(--success-600)' : 'var(--danger-600)' }}>
-                          {row.vendorCostUSD! > 0 ? `$${row.profitUSD!.toFixed(2)}` : <span style={{ color: 'var(--navy-300)' }}>—</span>}
+                          {row.usdCost != null
+                            ? `$${row.usdCost.toFixed(2)}`
+                            : <span style={{ color: 'var(--navy-300)' }}>—</span>}
                         </td>
                       )}
                       <td>
@@ -556,176 +439,6 @@ const Finance: React.FC = () => {
           </div>
         )}
       </div>
-
-      {/* ── Vendor Cost Modal ──────────────────────────────────────────────── */}
-      {showVcModal && (
-        <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowVcModal(false); }}>
-          <div className="modal-box" style={{ maxWidth: 640, width: '100%', maxHeight: '88vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
-              <div>
-                <h2 className="modal-title" style={{ margin: 0 }}>Vendor Costs — {MONTHS[selectedMonth - 1]} {selectedYear}</h2>
-                <p style={{ margin: '0.25rem 0 0', fontSize: '0.78rem', color: 'var(--navy-500)' }}>
-                  Set cost per label for each carrier/vendor. Used to calculate profit per client.
-                </p>
-              </div>
-              <button onClick={() => setShowVcModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--navy-400)', fontSize: '1.1rem' }}>✕</button>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-
-              {/* USPS (ShippersHub — cumulative) */}
-              <div style={{ background: 'var(--navy-50)', borderRadius: 'var(--radius-lg)', padding: '1rem 1.25rem' }}>
-                <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--navy-600)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.625rem' }}>
-                  USPS (ShippersHub — all non-manifest labels)
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  <label className="form-label" style={{ margin: 0, minWidth: 140 }}>Cost per label (USD)</label>
-                  <input
-                    className="form-input"
-                    type="number"
-                    min={0}
-                    step={0.001}
-                    style={{ maxWidth: 120 }}
-                    value={uspsVcRow?.costPerLabelUSD ?? ''}
-                    placeholder="0.000"
-                    onChange={e => {
-                      const val = parseFloat(e.target.value) || 0;
-                      setVcRows(prev => {
-                        const existing = prev.findIndex(r => r.carrier === 'USPS' && !r.vendorName);
-                        if (existing >= 0) {
-                          return prev.map((r, i) => i === existing ? { ...r, costPerLabelUSD: val } : r);
-                        }
-                        return [...prev, { carrier: 'USPS', vendorName: null, costPerLabelUSD: val }];
-                      });
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* Manifest vendors (UPS / FedEx / DHL) */}
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-                  <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--navy-600)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    Manifest Vendor Costs
-                  </div>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    {['UPS', 'FedEx', 'DHL'].map(c => {
-                      const vendors = manifestVendors[c] || [];
-                      return (
-                        <div key={c} style={{ position: 'relative' }}>
-                          <button
-                            className="btn btn-ghost btn-sm"
-                            onClick={() => {
-                              if (vendors.length > 0) {
-                                vendors.forEach(v => {
-                                  if (!vcRows.find(r => r.carrier === c && r.vendorName === v)) {
-                                    addVcRow(c, v);
-                                  }
-                                });
-                              } else {
-                                addVcRow(c, '');
-                              }
-                            }}
-                          >
-                            + {c}
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {otherVcRows.length === 0 ? (
-                  <div style={{ fontSize: '0.8rem', color: 'var(--navy-400)', fontStyle: 'italic', padding: '0.75rem 0' }}>
-                    No manifest vendor costs set. Click "+ UPS / FedEx / DHL" to add.
-                  </div>
-                ) : (
-                  <div style={{ overflowX: 'auto' }}>
-                    <table className="sh-table" style={{ fontSize: '0.82rem' }}>
-                      <thead>
-                        <tr>
-                          <th>Carrier</th>
-                          <th>Vendor Name</th>
-                          <th>Cost / Label (USD)</th>
-                          <th></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {otherVcRows.map((row, i) => {
-                          const globalIdx = vcRows.indexOf(row);
-                          return (
-                            <tr key={i}>
-                              <td>
-                                <select
-                                  className="form-input form-select"
-                                  style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem', minWidth: 80 }}
-                                  value={row.carrier}
-                                  onChange={e => setVcRows(prev => prev.map((r, idx) => idx === globalIdx ? { ...r, carrier: e.target.value } : r))}
-                                >
-                                  {['UPS', 'FedEx', 'DHL'].map(c => <option key={c} value={c}>{c}</option>)}
-                                </select>
-                              </td>
-                              <td>
-                                {(manifestVendors[row.carrier] || []).length > 0 ? (
-                                  <select
-                                    className="form-input form-select"
-                                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem', minWidth: 200 }}
-                                    value={row.vendorName || ''}
-                                    onChange={e => setVcRows(prev => prev.map((r, idx) => idx === globalIdx ? { ...r, vendorName: e.target.value || null } : r))}
-                                  >
-                                    <option value="">— select vendor —</option>
-                                    {(manifestVendors[row.carrier] || []).map(v => (
-                                      <option key={v} value={v}>{v}</option>
-                                    ))}
-                                  </select>
-                                ) : (
-                                  <input
-                                    className="form-input"
-                                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem', minWidth: 200 }}
-                                    value={row.vendorName || ''}
-                                    placeholder="No vendors found — enter manually"
-                                    onChange={e => setVcRows(prev => prev.map((r, idx) => idx === globalIdx ? { ...r, vendorName: e.target.value || null } : r))}
-                                  />
-                                )}
-                              </td>
-                              <td>
-                                <input
-                                  className="form-input"
-                                  type="number"
-                                  min={0}
-                                  step={0.001}
-                                  style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem', width: 100 }}
-                                  value={row.costPerLabelUSD}
-                                  onChange={e => setVcRows(prev => prev.map((r, idx) => idx === globalIdx ? { ...r, costPerLabelUSD: parseFloat(e.target.value) || 0 } : r))}
-                                />
-                              </td>
-                              <td>
-                                <button
-                                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger-500)', fontSize: '1rem' }}
-                                  onClick={() => removeVcRow(globalIdx)}
-                                >
-                                  ✕
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem' }}>
-              <button className="btn btn-ghost" onClick={() => setShowVcModal(false)}>Cancel</button>
-              <button className="btn btn-primary" onClick={saveVendorCosts} disabled={savingVc}>
-                {savingVc ? 'Saving…' : 'Save Vendor Costs'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
     </div>
   );

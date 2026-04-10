@@ -91,6 +91,7 @@ const ResellerClients: React.FC = () => {
   const [actionAmt,     setActionAmt]     = useState('');
   const [actionDesc,    setActionDesc]    = useState('');
   const [processingBal, setProcessingBal] = useState(false);
+  const [showAllTx,     setShowAllTx]     = useState(false);
 
   // ── Payment logs ─────────────────────────────────────────────
   const [payLogs,     setPayLogs]     = useState<PaymentLog[]>([]);
@@ -226,6 +227,7 @@ const ResellerClients: React.FC = () => {
     setBalAction('');
     setShowPayForm(false);
     setBalance(null);  // clear stale balance data
+    setShowAllTx(false);
     setPayLogs([]);
     setTotalPaid(0);
   };
@@ -619,25 +621,37 @@ const ResellerClients: React.FC = () => {
 
                       {/* Transactions */}
                       <div>
-                        <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--navy-400)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '0.375rem' }}>
-                          Recent Transactions
+                        <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--navy-400)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '0.375rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span>Transactions {balance?.recentTransactions?.length ? `(${balance.recentTransactions.length})` : ''}</span>
+                          {(balance?.recentTransactions?.length ?? 0) > 5 && (
+                            <button
+                              className="btn btn-ghost btn-sm"
+                              style={{ fontSize: '0.65rem', padding: '2px 7px' }}
+                              onClick={() => setShowAllTx(v => !v)}
+                            >
+                              {showAllTx ? 'Show less' : `Show all ${balance!.recentTransactions.length}`}
+                            </button>
+                          )}
                         </div>
                         {!balance?.recentTransactions?.length ? (
                           <p style={{ fontSize: '0.8rem', color: 'var(--navy-400)' }}>No transactions yet.</p>
-                        ) : balance.recentTransactions.slice(0, 8).map((tx, i) => (
-                          <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.4rem 0', borderBottom: i < 7 ? '1px solid var(--navy-50)' : 'none' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                              <span className={`status-dot ${txDot(tx.type)}`} />
-                              <div>
-                                <div style={{ fontSize: '0.75rem', color: 'var(--navy-800)' }}>{tx.description}</div>
-                                <div style={{ fontSize: '0.68rem', color: 'var(--navy-400)' }}>{new Date(tx.date).toLocaleDateString()}</div>
+                        ) : (() => {
+                          const txList = showAllTx ? balance.recentTransactions : balance.recentTransactions.slice(0, 5);
+                          return txList.map((tx, i) => (
+                            <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.4rem 0', borderBottom: i < txList.length - 1 ? '1px solid var(--navy-50)' : 'none' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                                <span className={`status-dot ${txDot(tx.type)}`} />
+                                <div>
+                                  <div style={{ fontSize: '0.75rem', color: 'var(--navy-800)' }}>{tx.description}</div>
+                                  <div style={{ fontSize: '0.68rem', color: 'var(--navy-400)' }}>{new Date(tx.date).toLocaleDateString()}</div>
+                                </div>
                               </div>
+                              <span style={{ fontSize: '0.78rem', fontWeight: 700, color: txColor(tx.type) }}>
+                                {tx.type === 'deduction' ? '−' : '+'}{fmt(tx.amount)}
+                              </span>
                             </div>
-                            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: txColor(tx.type) }}>
-                              {tx.type === 'deduction' ? '−' : '+'}{fmt(tx.amount)}
-                            </span>
-                          </div>
-                        ))}
+                          ));
+                        })()}
                       </div>
 
                       {/* ── Payment Log ── */}

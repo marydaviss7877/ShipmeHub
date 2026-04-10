@@ -5,7 +5,6 @@ const fs         = require('fs');
 const mongoose   = require('mongoose'); // already imported — used for ObjectId validation
 const PaymentLog = require('../models/PaymentLog');
 const User       = require('../models/User');
-const SalesAgentProfile = require('../models/SalesAgentProfile');
 const { authenticateToken, authorize } = require('../middleware/auth');
 
 const router = express.Router();
@@ -44,19 +43,6 @@ async function canManage(caller, targetUserId) {
   return false;
 }
 
-/**
- * Returns true if the given userId belongs to a sales agent's client list.
- * (Any user who has a SalesAgentProfile and has this userId in their clients)
- */
-async function isSalesAgentClient(userId) {
-  // Find any user who has this userId in their clients array
-  const manager = await User.findOne({ clients: userId }).select('_id').lean();
-  if (!manager) return false;
-  // Check if that manager has a SalesAgentProfile
-  const profile = await SalesAgentProfile.findOne({ user: manager._id }).select('_id').lean();
-  return !!profile;
-}
-
 // ── GET /api/payment-logs/screenshot/:filename ────────────────
 // Serve screenshot files — no auth required (filenames are random UUIDs)
 // IMPORTANT: must be defined BEFORE /:userId to avoid route shadowing
@@ -69,7 +55,7 @@ router.get('/screenshot/:filename', (req, res) => {
 });
 
 // ── GET /api/payment-logs/:userId ─────────────────────────────
-// Returns all payment logs + total paid for a user + isSalesAgentClient flag
+// Returns all payment logs + total paid for a user
 router.get('/:userId', authenticateToken, authorize('admin', 'reseller'), async (req, res) => {
   try {
     const { userId } = req.params;
@@ -89,9 +75,8 @@ router.get('/:userId', authenticateToken, authorize('admin', 'reseller'), async 
       .sort({ date: -1 });
 
     const totalPaid = logs.reduce((sum, l) => sum + l.amount, 0);
-    const salesAgent = await isSalesAgentClient(userId);
 
-    res.json({ logs, totalPaid, isSalesAgentClient: salesAgent });
+    res.json({ logs, totalPaid });
   } catch (err) {
     console.error('Get payment logs error:', err);
     res.status(500).json({ message: 'Server error' });
