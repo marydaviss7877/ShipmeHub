@@ -142,8 +142,9 @@ axios.interceptors.response.use(
   (response) => response,
   (error) => {
     const url = error.config?.url || '';
-    const isAuthEndpoint = url.includes('/auth/login') || url.includes('/auth/register');
-    if (error.response?.status === 401 && !isAuthEndpoint) {
+    const isAuthEndpoint    = url.includes('/auth/login') || url.includes('/auth/register');
+    const isVendorEndpoint  = url.includes('/vendor-portal/');
+    if (error.response?.status === 401 && !isAuthEndpoint && !isVendorEndpoint) {
       localStorage.removeItem('token');
       window.location.href = '/login';
     }
