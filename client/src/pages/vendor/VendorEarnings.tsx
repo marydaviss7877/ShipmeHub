@@ -3,7 +3,7 @@ import axios from 'axios';
 import { useVendorAuth } from '../../contexts/VendorAuthContext';
 import { CurrencyDollarIcon } from '@heroicons/react/24/outline';
 
-const API = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+const API = '/api';
 
 const VendorEarnings: React.FC = () => {
   const { token } = useVendorAuth();

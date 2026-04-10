@@ -1,8 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import axios from 'axios';
 
-const API = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
-
 interface VendorInfo {
   _id: string;
   name: string;
@@ -35,7 +33,7 @@ export const VendorAuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const login = async (email: string, password: string) => {
-    const { data } = await axios.post(`${API}/vendor-portal/auth/login`, { email, password });
+    const { data } = await axios.post('/api/vendor-portal/auth/login', { email, password });
     setToken(data.token);
     setVendor(data.vendor);
     localStorage.setItem('vendorToken', data.token);

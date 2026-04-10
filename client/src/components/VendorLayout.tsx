@@ -1,5 +1,5 @@
 import React from 'react';
-import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
+import { Outlet, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { useVendorAuth } from '../contexts/VendorAuthContext';
 import {
   QueueListIcon,
@@ -9,9 +9,21 @@ import {
 } from '@heroicons/react/24/outline';
 
 const VendorLayout: React.FC = () => {
-  const { vendor, logout } = useVendorAuth();
+  const { vendor, loading, logout } = useVendorAuth();
   const location = useLocation();
   const navigate = useNavigate();
+
+  // Wait for localStorage hydration before deciding auth state
+  if (loading) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ width: 32, height: 32, border: '3px solid rgba(255,255,255,0.1)', borderTop: '3px solid #6366f1', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
+
+  if (!vendor) return <Navigate to="/vendor-portal/login" replace />;
 
   const nav = [
     { name: 'My Jobs',   href: '/vendor-portal/jobs',     icon: QueueListIcon,       active: location.pathname.startsWith('/vendor-portal/jobs') },

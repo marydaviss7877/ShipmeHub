@@ -7,7 +7,7 @@ import {
   XMarkIcon, ClockIcon, ArrowLeftIcon,
 } from '@heroicons/react/24/outline';
 
-const API = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+const API = '/api';
 
 const VendorJobDetail: React.FC = () => {
   const { id }      = useParams<{ id: string }>();

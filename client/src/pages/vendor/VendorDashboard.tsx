@@ -7,7 +7,7 @@ import {
   ExclamationTriangleIcon, QueueListIcon,
 } from '@heroicons/react/24/outline';
 
-const API = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+const API = '/api';
 
 const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
   open:         { label: 'Open — Claim It',      color: '#0891b2', bg: '#ecfeff' },
