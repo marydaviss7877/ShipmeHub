@@ -103,7 +103,7 @@ const UserManagement: React.FC = () => {
   const [showAllTx,    setShowAllTx]    = useState(false);
 
   // ── Wallets ──────────────────────────────────────────────────
-  const [wallets,           setWallets]          = useState<Wallet[]>([]);
+  const [, setWallets]          = useState<Wallet[]>([]);
 
   // ── Payment logs ─────────────────────────────────────────────
   const [payLogs,       setPayLogs]      = useState<PaymentLog[]>([]);
@@ -113,7 +113,7 @@ const UserManagement: React.FC = () => {
   const [payAmt,        setPayAmt]       = useState('');
   const [payDate,       setPayDate]      = useState(new Date().toISOString().slice(0, 10));
   const [payNote,       setPayNote]      = useState('');
-  const [payWallet,     setPayWallet]    = useState('');
+  const [, setPayWallet]    = useState('');
   const [payFiles,      setPayFiles]     = useState<File[]>([]);
   const [payRemove,     setPayRemove]    = useState<string[]>([]);
   const [savingPay,     setSavingPay]    = useState(false);
