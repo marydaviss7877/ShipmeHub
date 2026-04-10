@@ -68,7 +68,8 @@ const VendorJobDetail: React.FC = () => {
       const form = new FormData();
       form.append('file', file);
       await axios.post(`${API}/vendor-portal/jobs/${id}/upload`, form, {
-        headers: authHeaders,
+        headers: { Authorization: `Bearer ${token}` },
+        // Do NOT set Content-Type — axios auto-sets multipart/form-data with boundary
       });
       setSuccess('File uploaded! You have 1 minute to cancel if you find an error.');
       setFile(null);
@@ -91,8 +92,30 @@ const VendorJobDetail: React.FC = () => {
     }
   };
 
-  const handleDownloadRequest = () => {
-    window.open(`${API}/vendor-portal/jobs/${id}/download-request?token=${token}`, '_blank');
+  const [downloading, setDownloading] = useState(false);
+
+  const handleDownloadRequest = async () => {
+    setDownloading(true);
+    setError('');
+    try {
+      const res = await axios.get(`${API}/vendor-portal/jobs/${id}/download-request`, {
+        headers:      authHeaders,
+        responseType: 'blob',
+      });
+      const filename = job?.requestFile?.originalName || `manifest-${id}.csv`;
+      const url  = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href  = url;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Download failed');
+    } finally {
+      setDownloading(false);
+    }
   };
 
   if (loading) return <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>Loading…</div>;
@@ -177,9 +200,9 @@ const VendorJobDetail: React.FC = () => {
           <p style={{ color: '#475569', fontSize: '0.875rem', marginBottom: 16 }}>
             You have claimed this job. Download the shipping data below, generate the labels, then upload the result.
           </p>
-          <button onClick={handleDownloadRequest} className="btn btn-ghost">
+          <button onClick={handleDownloadRequest} disabled={downloading} className="btn btn-ghost">
             <ArrowDownTrayIcon style={{ width: 16, height: 16 }} />
-            Download Request File ({job.requestFile?.labelCount} rows)
+            {downloading ? 'Downloading…' : `Download Request File (${job.requestFile?.labelCount} rows)`}
           </button>
         </div>
       )}

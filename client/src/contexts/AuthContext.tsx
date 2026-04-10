@@ -125,9 +125,13 @@ axios.defaults.baseURL = API_URL;
 // Add request interceptor to include token
 axios.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    // Never overwrite vendor-portal requests — they carry their own token
+    const isVendorRequest = config.url?.includes('/vendor-portal/');
+    if (!isVendorRequest) {
+      const token = localStorage.getItem('token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
     }
     return config;
   },
