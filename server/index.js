@@ -62,7 +62,27 @@ const io = new Server(server, {
 });
 
 // ── Security middleware ───────────────────────────────────────
-app.use(helmet());
+const cspConnectSrc = ["'self'", ...allowedOrigins];
+if (process.env.NODE_ENV === 'production') {
+  cspConnectSrc.push('wss:');
+}
+
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", 'data:', 'blob:'],
+      fontSrc: ["'self'", 'data:'],
+      connectSrc: cspConnectSrc,
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      frameAncestors: ["'self'"],
+      upgradeInsecureRequests: [],
+    },
+  },
+}));
 app.use(cors({
   origin: allowedOrigins,
   credentials: true
