@@ -16,9 +16,15 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   useEffect(() => {
     if (isAuthenticated && user && token) {
-      // Strip the /api path — Socket.IO connects to the base server URL only
-      const apiUrl    = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
-      const serverUrl = apiUrl.replace(/\/api\/?$/, '');
+      // Resolve API URL safely for both local dev and single-service production deploys.
+      const apiUrl = process.env.REACT_APP_API_URL
+        || (window.location.hostname === 'localhost' ? 'http://localhost:5001/api' : '/api');
+
+      // Strip the /api path — Socket.IO connects to the base server URL only.
+      // If apiUrl is relative (e.g. "/api"), socket should connect to current origin.
+      const serverUrl = apiUrl.startsWith('http')
+        ? apiUrl.replace(/\/api\/?$/, '')
+        : window.location.origin;
 
       const newSocket = io(serverUrl, {
         // Use default transports (polling → websocket upgrade).

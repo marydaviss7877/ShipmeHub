@@ -117,7 +117,8 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Axios configuration
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+const API_URL = process.env.REACT_APP_API_URL
+  || (window.location.hostname === 'localhost' ? 'http://localhost:5001/api' : '/api');
 
 // Configure axios defaults
 axios.defaults.baseURL = API_URL;
