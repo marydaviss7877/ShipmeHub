@@ -126,6 +126,11 @@ axios.defaults.baseURL = API_URL;
 // Add request interceptor to include token
 axios.interceptors.request.use(
   (config) => {
+    // In production/single-service deploys, guard against legacy absolute localhost API URLs.
+    if (window.location.hostname !== 'localhost' && typeof config.url === 'string') {
+      config.url = config.url.replace(/^http:\/\/localhost:5001\/api/, '/api');
+    }
+
     // Never overwrite vendor-portal requests — they carry their own token
     const isVendorRequest = config.url?.includes('/vendor-portal/');
     if (!isVendorRequest) {
