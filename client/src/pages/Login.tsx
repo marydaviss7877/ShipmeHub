@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { EyeIcon, EyeSlashIcon, TruckIcon, ShieldCheckIcon, ClockIcon, ExclamationCircleIcon } from '@heroicons/react/24/outline';
 import BrandMonogram from '../components/BrandMonogram';
@@ -323,14 +323,14 @@ const Login: React.FC = () => {
 
           <p style={{ textAlign: 'center', marginTop: 20, fontSize: '0.875rem', color: '#64748b' }}>
             Don't have an account?{' '}
-            <a
-              href="/signup"
+            <Link
+              to="/signup"
               style={linkStyle}
               onMouseEnter={(e) => { e.currentTarget.style.color = '#4f46e5'; }}
               onMouseLeave={(e) => { e.currentTarget.style.color = '#6366f1'; }}
             >
               Create free account
-            </a>
+            </Link>
           </p>
         </div>
       </div>

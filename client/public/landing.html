@@ -1089,5 +1089,31 @@
   onScroll();
 })();
 </script>
+
+<script>
+/* ── Iframe navigation fix ─────────────────────────────────────────────
+   When landing.html is served inside LandingProxy's <iframe>, every
+   click on a path-based link (e.g. /login, /signup) would navigate the
+   iframe's own document, leaving the parent window stuck on "/".
+   This intercept catches those clicks and routes them through window.top
+   so the PARENT browsing context navigates — giving proper URL changes.
+   Hash links (#ch-03 etc.) are intentionally ignored so in-page smooth
+   scrolling keeps working inside the iframe.
+──────────────────────────────────────────────────────────────────────── */
+(function () {
+  if (window.self === window.top) return; // not in an iframe — no-op
+
+  document.addEventListener('click', function (e) {
+    var el = e.target.closest('a[href]');
+    if (!el) return;
+    var href = el.getAttribute('href');
+    // Only intercept absolute-path links (starts with / but not //)
+    if (href && href.charAt(0) === '/' && href.charAt(1) !== '/') {
+      e.preventDefault();
+      window.top.location.href = href;
+    }
+  });
+}());
+</script>
 </body>
 </html>
