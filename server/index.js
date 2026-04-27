@@ -71,13 +71,38 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", 'data:', 'blob:'],
-      fontSrc: ["'self'", 'data:'],
-      connectSrc: cspConnectSrc,
+      // 'unsafe-inline' required for landing.html inline scripts (rate ticker,
+      // savings calc, iframe-nav intercept) and the Google Analytics dataLayer snippet.
+      scriptSrc: [
+        "'self'",
+        "'unsafe-inline'",
+        "https://www.googletagmanager.com",
+      ],
+      styleSrc: [
+        "'self'",
+        "'unsafe-inline'",
+        "https://fonts.googleapis.com",   // Google Fonts CSS
+      ],
+      imgSrc: [
+        "'self'",
+        'data:',
+        'blob:',
+        "https://www.google-analytics.com",
+      ],
+      fontSrc: [
+        "'self'",
+        'data:',
+        "https://fonts.gstatic.com",       // Google Fonts files (woff2 etc.)
+      ],
+      connectSrc: [
+        ...cspConnectSrc,
+        "https://www.google-analytics.com",
+        "https://analytics.google.com",
+        "https://region1.analytics.google.com",
+        "https://www.googletagmanager.com",
+      ],
       objectSrc: ["'none'"],
-      baseUri: ["'self'"],
+      baseUri:   ["'self'"],
       frameAncestors: ["'self'"],
       upgradeInsecureRequests: [],
     },
