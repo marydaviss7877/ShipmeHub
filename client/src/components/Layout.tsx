@@ -3,6 +3,7 @@ import { Outlet, useLocation, useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 import ThemeToggle from './ThemeToggle';
+import BrandMonogram from './BrandMonogram';
 import {
   HomeIcon,
   UserGroupIcon,
@@ -10,7 +11,6 @@ import {
   ArrowLeftOnRectangleIcon,
   Bars3Icon,
   XMarkIcon,
-  TruckIcon,
   TagIcon,
   ClipboardDocumentListIcon,
   RectangleStackIcon,
@@ -358,7 +358,7 @@ const Layout: React.FC = () => {
         <div className={`sidebar-logo${collapsed ? ' sidebar-logo-collapsed' : ''}`}>
           <div style={{ display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 10, overflow: 'hidden', flex: 1, minWidth: 0 }}>
             <div className="sidebar-logo-icon">
-              <TruckIcon style={{ width: 18, height: 18, color: '#fff' }} />
+              <BrandMonogram size={18} color="#fff" strokeWidth={2.2} />
             </div>
             {!collapsed && (
               <div style={{ overflow: 'hidden', flex: 1 }}>

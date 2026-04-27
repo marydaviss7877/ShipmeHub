@@ -496,12 +496,13 @@ html[data-theme='dark'] .alert-info    { background: rgba(30, 58, 138, 0.25); co
 }
 .sidebar-logo-icon {
   width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
-  background: linear-gradient(135deg, var(--accent-600), var(--accent-400));
+  background: #fff;
+  border: 1px solid rgba(255,255,255,0.22);
   display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 4px 14px rgba(37,99,235,0.45);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.35);
   transition: box-shadow var(--transition-base);
 }
-.sidebar-logo-icon:hover { box-shadow: 0 6px 20px rgba(37,99,235,0.6); }
+.sidebar-logo-icon:hover { box-shadow: 0 6px 20px rgba(0,0,0,0.45); }
 .sidebar-brand-name {
   font-size: 0.95rem; font-weight: 800; color: #fff;
   letter-spacing: -0.01em; line-height: 1.2; white-space: nowrap;

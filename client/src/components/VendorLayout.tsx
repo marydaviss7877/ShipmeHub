@@ -1,11 +1,11 @@
 import React from 'react';
 import { Outlet, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { useVendorAuth } from '../contexts/VendorAuthContext';
+import BrandMonogram from './BrandMonogram';
 import {
   QueueListIcon,
   CurrencyDollarIcon,
   ArrowLeftOnRectangleIcon,
-  BriefcaseIcon,
 } from '@heroicons/react/24/outline';
 
 const VendorLayout: React.FC = () => {
@@ -45,10 +45,11 @@ const VendorLayout: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{
               width: 32, height: 32, borderRadius: 8, flexShrink: 0,
-              background: 'linear-gradient(135deg, #334155, #475569)',
+              background: '#fff',
+              border: '1px solid rgba(255,255,255,0.35)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
-              <BriefcaseIcon style={{ width: 17, height: 17, color: '#94a3b8' }} />
+              <BrandMonogram size={17} color="#111" strokeWidth={2.1} />
             </div>
             <div>
               <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#e2e8f0', lineHeight: 1.2 }}>Label Flow</div>

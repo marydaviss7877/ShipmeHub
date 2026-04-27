@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useVendorAuth } from '../../contexts/VendorAuthContext';
-import { BriefcaseIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
+import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
+import BrandMonogram from '../../components/BrandMonogram';
 
 const VendorLogin: React.FC = () => {
   const [email,    setEmail]    = useState('');
@@ -38,10 +39,11 @@ const VendorLogin: React.FC = () => {
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
           <div style={{
             width: 52, height: 52, borderRadius: 14, margin: '0 auto 12px',
-            background: 'linear-gradient(135deg, #334155, #475569)',
+            background: '#fff',
+            border: '1px solid rgba(255,255,255,0.35)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            <BriefcaseIcon style={{ width: 26, height: 26, color: '#94a3b8' }} />
+            <BrandMonogram size={26} color="#111" strokeWidth={2.1} />
           </div>
           <h1 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#f1f5f9', margin: 0 }}>Label Flow</h1>
           <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem', marginTop: 4 }}>Vendor Access</p>
