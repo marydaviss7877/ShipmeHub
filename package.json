@@ -8,10 +8,14 @@
     "server": "nodemon server/index.js",
     "client": "cd client && npm start",
     "serve": "node server/index.js",
-    "build": "cd client && npm install && npm run build",
+    "build": "cd client && npm install --include=dev && npm run build",
     "install-client": "cd client && npm install",
     "install-server": "npm install",
     "install-all": "npm run install-server && npm run install-client"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
   },
   "keywords": [
     "usps",
