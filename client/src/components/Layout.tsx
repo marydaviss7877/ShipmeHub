@@ -358,7 +358,7 @@ const Layout: React.FC = () => {
         <div className={`sidebar-logo${collapsed ? ' sidebar-logo-collapsed' : ''}`}>
           <div style={{ display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 10, overflow: 'hidden', flex: 1, minWidth: 0 }}>
             <div className="sidebar-logo-icon">
-              <BrandMonogram size={18} color="#fff" strokeWidth={2.2} />
+              <BrandMonogram size={18} color="#0A0F1F" strokeWidth={2.2} />
             </div>
             {!collapsed && (
               <div style={{ overflow: 'hidden', flex: 1 }}>
