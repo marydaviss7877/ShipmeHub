@@ -37,7 +37,8 @@ interface CashBookEntry {
 // Screenshots are stored as "/api/payment-logs/screenshot/filename.jpg".
 // <img src> always requests from the React dev-server (port 3000), not the API
 // server (port 5001), so we must prefix with the full server origin.
-const API_BASE = (process.env.REACT_APP_API_URL || 'http://localhost:5001/api')
+const API_BASE = (process.env.REACT_APP_API_URL
+  || (window.location.hostname === 'localhost' ? 'http://localhost:5001/api' : '/api'))
   .replace(/\/api\/?$/, '');   // → "http://localhost:5001"
 
 const toAbsoluteUrl = (path: string) =>
@@ -313,7 +314,7 @@ const CashBook: React.FC = () => {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
         {/* Credits */}
         <div style={{
-          background: '#fff', borderRadius: 16, padding: '1.5rem 1.75rem',
+          background: 'var(--bg-card)', borderRadius: 16, padding: '1.5rem 1.75rem',
           boxShadow: '0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(21,128,61,0.08)',
           border: '1px solid #dcfce7', position: 'relative', overflow: 'hidden',
         }}>
@@ -330,7 +331,7 @@ const CashBook: React.FC = () => {
 
         {/* Debits */}
         <div style={{
-          background: '#fff', borderRadius: 16, padding: '1.5rem 1.75rem',
+          background: 'var(--bg-card)', borderRadius: 16, padding: '1.5rem 1.75rem',
           boxShadow: '0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(220,38,38,0.08)',
           border: '1px solid #fee2e2', position: 'relative', overflow: 'hidden',
         }}>
@@ -421,7 +422,7 @@ const CashBook: React.FC = () => {
                 {entries.map((e, i) => {
                   const isCredit = e.entryType === 'credit';
                   return (
-                    <tr key={e._id} style={{ borderBottom: i < entries.length - 1 ? '1px solid var(--navy-50)' : 'none', background: i % 2 === 0 ? '#fff' : 'var(--navy-25)' }}>
+                    <tr key={e._id} style={{ borderBottom: i < entries.length - 1 ? '1px solid var(--navy-50)' : 'none', background: i % 2 === 0 ? 'var(--bg-card)' : 'var(--navy-25)' }}>
                       <td style={{ padding: '0.625rem 0.875rem', fontSize: '0.82rem', color: 'var(--navy-700)', whiteSpace: 'nowrap' }}>
                         {new Date(e.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                       </td>
@@ -435,7 +436,7 @@ const CashBook: React.FC = () => {
                           {isCredit ? '▲ CREDIT' : '▼ DEBIT'}
                         </span>
                         {e.source === 'payment_log' && (
-                          <span style={{ fontSize: '0.62rem', color: '#15803d', background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '1px 5px', borderRadius: 3, marginLeft: 4 }}>pmt</span>
+                          <span style={{ fontSize: '0.62rem', color: 'var(--success-700)', background: 'var(--success-50)', border: '1px solid var(--success-100)', padding: '1px 5px', borderRadius: 3, marginLeft: 4 }}>pmt</span>
                         )}
                       </td>
                       <td style={{ padding: '0.625rem 0.875rem', whiteSpace: 'nowrap' }}>
@@ -457,7 +458,7 @@ const CashBook: React.FC = () => {
                       </td>
                       <td style={{ padding: '0.625rem 0.875rem' }}>
                         {e.source === 'payment_log' ? (
-                          <span style={{ fontSize: '0.72rem', fontWeight: 600, padding: '2px 7px', borderRadius: 4, background: '#dcfce7', color: '#15803d' }}>
+                          <span style={{ fontSize: '0.72rem', fontWeight: 600, padding: '2px 7px', borderRadius: 4, background: 'var(--success-100)', color: 'var(--success-700)' }}>
                             Client Payment
                           </span>
                         ) : e.category ? (
@@ -580,7 +581,7 @@ const CashBook: React.FC = () => {
                       style={{
                         flex: 1, padding: '0.5rem', border: '2px solid', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: '0.82rem',
                         borderColor: entryForm.entryType === t ? (t === 'credit' ? '#15803d' : '#dc2626') : 'var(--navy-200)',
-                        background: entryForm.entryType === t ? (t === 'credit' ? '#dcfce7' : '#fee2e2') : '#fff',
+                        background: entryForm.entryType === t ? (t === 'credit' ? 'var(--success-100)' : 'var(--danger-100)') : 'var(--bg-card)',
                         color: entryForm.entryType === t ? (t === 'credit' ? '#15803d' : '#dc2626') : 'var(--navy-400)',
                       }}>
                       {t === 'credit' ? '▲ Credit (In)' : '▼ Debit (Out)'}
@@ -685,7 +686,7 @@ const CashBook: React.FC = () => {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                 {categories.map(c => (
-                  <div key={c._id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#fff', border: '1px solid var(--navy-100)', borderRadius: 8, padding: '0.5rem 0.75rem', opacity: c.isActive ? 1 : 0.55 }}>
+                  <div key={c._id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg-card)', border: '1px solid var(--navy-100)', borderRadius: 8, padding: '0.5rem 0.75rem', opacity: c.isActive ? 1 : 0.55 }}>
                     <div style={{ flex: 1 }}>
                       <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--navy-800)' }}>{c.name}</span>
                       <span style={{ fontSize: '0.72rem', marginLeft: 8, color: CAT_TYPE_COLORS[c.type] || '#64748b' }}>{c.type}</span>
@@ -736,7 +737,7 @@ const CashBook: React.FC = () => {
           {/* Image / PDF preview */}
           <div onClick={ev => ev.stopPropagation()} style={{ maxWidth: '88vw', maxHeight: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {lightboxUrls[lightboxIdx]?.toLowerCase().endsWith('.pdf') ? (
-              <div style={{ background: '#fff', borderRadius: 12, padding: '2rem 3rem', textAlign: 'center' }}>
+              <div style={{ background: 'var(--bg-card)', borderRadius: 12, padding: '2rem 3rem', textAlign: 'center' }}>
                 <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📄</div>
                 <div style={{ fontSize: '0.9rem', color: 'var(--navy-700)', marginBottom: '1rem' }}>PDF Document</div>
                 <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>

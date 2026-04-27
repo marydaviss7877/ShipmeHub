@@ -20,7 +20,7 @@
     "mern",
     "portal"
   ],
-  "author": "ShipmeHub",
+  "author": "Label Flow",
   "license": "MIT",
   "dependencies": {
     "archiver": "^7.0.1",

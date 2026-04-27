@@ -322,7 +322,7 @@ const AnnouncementCard: React.FC<{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <span style={{ fontSize: '0.72rem', color: 'var(--navy-400)' }}>
-            {item.createdBy ? `${item.createdBy.firstName} ${item.createdBy.lastName}` : 'ShipmeHub'}
+            {item.createdBy ? `${item.createdBy.firstName} ${item.createdBy.lastName}` : 'Label Flow'}
           </span>
           <span style={{ fontSize: '0.72rem', color: 'var(--navy-400)', fontWeight: 500 }}>{date}</span>
         </div>
@@ -332,7 +332,8 @@ const AnnouncementCard: React.FC<{
 };
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
-const API = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+const API = process.env.REACT_APP_API_URL
+  || (window.location.hostname === 'localhost' ? 'http://localhost:5001/api' : '/api');
 
 const Announcements: React.FC = () => {
   const { user } = useAuth();

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Outlet, useLocation, useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
+import ThemeToggle from './ThemeToggle';
 import {
   HomeIcon,
   UserGroupIcon,
@@ -51,7 +52,8 @@ const CAT_LABEL: Record<string, string> = {
 
 const DISMISSED_KEY = 'sh_dismissed_announcements';
 const LAST_SEEN_KEY = 'sh_announcements_last_seen';
-const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+const API_BASE = process.env.REACT_APP_API_URL
+  || (window.location.hostname === 'localhost' ? 'http://localhost:5001/api' : '/api');
 
 interface NavItem {
   name: string;
@@ -360,8 +362,8 @@ const Layout: React.FC = () => {
             </div>
             {!collapsed && (
               <div style={{ overflow: 'hidden', flex: 1 }}>
-                <div className="sidebar-brand-name">ShipmeHub</div>
-                <div className="sidebar-brand-sub">Label Portal</div>
+                <div className="sidebar-brand-name">Label Flow</div>
+                <div className="sidebar-brand-sub">Label Flow</div>
               </div>
             )}
           </div>
@@ -510,6 +512,7 @@ const Layout: React.FC = () => {
 
           {/* Right side */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <ThemeToggle compact className="topbar-icon-btn" />
 
             {/* Notification bell */}
             <div ref={bellRef} style={{ position: 'relative' }}>

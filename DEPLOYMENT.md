@@ -1,6 +1,6 @@
-# Deployment Guide - USPS Label Portal
+# Deployment Guide - Label Flow
 
-This guide will help you deploy the USPS Label Portal to Railway for production use.
+This guide will help you deploy the Label Flow to Railway for production use.
 
 ## Prerequisites
 
@@ -204,6 +204,6 @@ As your application grows:
 
 ---
 
-**Your USPS Label Portal is now live! 🎉**
+**Your Label Flow is now live! 🎉**
 
 For support, check the logs and documentation, or create an issue in the GitHub repository.

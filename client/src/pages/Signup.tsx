@@ -59,8 +59,8 @@ const Signup: React.FC = () => {
               <TruckIcon style={{ width: 28, height: 28, color: '#fff' }} />
             </div>
             <div>
-              <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#fff', letterSpacing: '-0.02em' }}>ShipmeHub</div>
-              <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.45)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Label Portal</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#fff', letterSpacing: '-0.02em' }}>Label Flow</div>
+              <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.45)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Label Flow</div>
             </div>
           </div>
 

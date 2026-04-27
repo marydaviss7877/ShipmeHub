@@ -103,12 +103,12 @@ const Login: React.FC = () => {
 
           <div style={{ position: 'relative', zIndex: 1 }}>
             {/* Logo */}
-            <a href="/landing.html" style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 48, textDecoration: 'none' }}>
+            <a href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 48, textDecoration: 'none' }}>
               <div style={{ width: 38, height: 38, background: '#f96422', borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 19, flexShrink: 0 }}>
                 📦
               </div>
               <span style={{ fontSize: '1.3rem', fontWeight: 800, color: '#fff', letterSpacing: '-0.4px' }}>
-                Label<span style={{ color: '#f96422' }}>Profit</span>
+                Label<span style={{ color: '#f96422' }}> Flow</span>
               </span>
             </a>
 
@@ -180,12 +180,12 @@ const Login: React.FC = () => {
             padding: '28px 24px 32px',
             display: 'flex', flexDirection: 'column', alignItems: 'center',
           }}>
-            <a href="/landing.html" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', marginBottom: 16 }}>
+            <a href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', marginBottom: 16 }}>
               <div style={{ width: 34, height: 34, background: '#f96422', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17 }}>
                 📦
               </div>
               <span style={{ fontSize: '1.15rem', fontWeight: 800, color: '#fff', letterSpacing: '-0.4px' }}>
-                Label<span style={{ color: '#f96422' }}>Profit</span>
+                Label<span style={{ color: '#f96422' }}> Flow</span>
               </span>
             </a>
             <p style={{ margin: 0, fontSize: '0.82rem', color: 'rgba(255,255,255,0.5)', textAlign: 'center' }}>
@@ -209,7 +209,7 @@ const Login: React.FC = () => {
               Welcome back
             </h3>
             <p style={{ fontSize: '0.875rem', color: '#6b7280', fontWeight: 400 }}>
-              Sign in to your LabelProfit account
+              Sign in to your Label Flow account
             </p>
           </div>
 

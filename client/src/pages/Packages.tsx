@@ -119,7 +119,7 @@ const PackageCard = ({ pkg, selected, onSelect }: { pkg: PackageTier; selected: 
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        background: '#fff',
+        background: 'var(--bg-card)',
         borderRadius: 20,
         padding: '1.75rem 1.5rem',
         cursor: 'pointer',
@@ -161,8 +161,8 @@ const PackageCard = ({ pkg, selected, onSelect }: { pkg: PackageTier; selected: 
           <pkg.Icon style={{ width: 22, height: 22, color: pkg.color }} />
         </div>
         <div>
-          <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>{pkg.name}</h3>
-          <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748b' }}>{pkg.tagline}</p>
+          <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--navy-900)' }}>{pkg.name}</h3>
+          <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--navy-500)' }}>{pkg.tagline}</p>
         </div>
       </div>
 
@@ -173,15 +173,15 @@ const PackageCard = ({ pkg, selected, onSelect }: { pkg: PackageTier; selected: 
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
         <div>
-          <p style={{ margin: 0, fontSize: '0.68rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Label Discount</p>
+          <p style={{ margin: 0, fontSize: '0.68rem', color: 'var(--navy-500)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Label Discount</p>
           <p style={{ margin: 0, fontSize: '1.6rem', fontWeight: 900, color: pkg.color, lineHeight: 1.1 }}>
-            {pkg.discount}% <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8' }}>off retail</span>
+            {pkg.discount}% <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--navy-400)' }}>off retail</span>
           </p>
         </div>
         {pkg.creditLimit > 0 && (
           <div style={{ textAlign: 'right' }}>
-            <p style={{ margin: 0, fontSize: '0.68rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Credit Facility</p>
-            <p style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>
+            <p style={{ margin: 0, fontSize: '0.68rem', color: 'var(--navy-500)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Credit Facility</p>
+            <p style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--navy-900)' }}>
               ${pkg.creditLimit.toLocaleString()}
             </p>
           </div>
@@ -190,12 +190,12 @@ const PackageCard = ({ pkg, selected, onSelect }: { pkg: PackageTier; selected: 
 
       {/* Monthly minimum */}
       {pkg.monthlyMin > 0 && (
-        <p style={{ margin: '0 0 1rem', fontSize: '0.74rem', color: '#64748b' }}>
-          <span style={{ color: '#0f172a', fontWeight: 700 }}>${pkg.monthlyMin.toLocaleString()}</span> monthly minimum spend
+        <p style={{ margin: '0 0 1rem', fontSize: '0.74rem', color: 'var(--navy-500)' }}>
+          <span style={{ color: 'var(--navy-900)', fontWeight: 700 }}>${pkg.monthlyMin.toLocaleString()}</span> monthly minimum spend
         </p>
       )}
       {pkg.monthlyMin === 0 && (
-        <p style={{ margin: '0 0 1rem', fontSize: '0.74rem', color: '#64748b' }}>No minimum spend required</p>
+        <p style={{ margin: '0 0 1rem', fontSize: '0.74rem', color: 'var(--navy-500)' }}>No minimum spend required</p>
       )}
 
       {/* Features */}
@@ -208,26 +208,26 @@ const PackageCard = ({ pkg, selected, onSelect }: { pkg: PackageTier; selected: 
             }}>
               <CheckIcon style={{ width: 10, height: 10, color: pkg.color, strokeWidth: 3 }} />
             </div>
-            <span style={{ fontSize: '0.78rem', color: '#475569', lineHeight: 1.45 }}>{f}</span>
+            <span style={{ fontSize: '0.78rem', color: 'var(--navy-600)', lineHeight: 1.45 }}>{f}</span>
           </div>
         ))}
       </div>
 
       {/* CTA */}
       <a
-        href={`mailto:support@shipmehub.com?subject=Package%20Inquiry%20%E2%80%94%20ShipmeHub&body=Hi%2C%20I%27m%20interested%20in%20the%20${encodeURIComponent(pkg.name)}%20package.`}
+        href={`mailto:support@shipmehub.com?subject=Package%20Inquiry%20%E2%80%94%20Label Flow&body=Hi%2C%20I%27m%20interested%20in%20the%20${encodeURIComponent(pkg.name)}%20package.`}
         onClick={e => e.stopPropagation()}
         style={{
           display: 'block', textAlign: 'center',
           padding: '0.7rem', borderRadius: 10,
-          background: selected ? pkg.gradient : '#f1f5f9',
-          border: `1px solid ${selected ? 'transparent' : '#e2e8f0'}`,
-          color: selected ? '#fff' : '#0f172a',
+          background: selected ? pkg.gradient : 'var(--navy-100)',
+          border: `1px solid ${selected ? 'transparent' : 'var(--navy-200)'}`,
+          color: selected ? '#fff' : 'var(--navy-900)',
           fontSize: '0.8rem', fontWeight: 700,
           textDecoration: 'none', transition: 'all 0.15s',
         }}
         onMouseEnter={e => { if (!selected) e.currentTarget.style.background = `${pkg.color}18`; }}
-        onMouseLeave={e => { if (!selected) e.currentTarget.style.background = '#f1f5f9'; }}
+        onMouseLeave={e => { if (!selected) e.currentTarget.style.background = 'var(--navy-100)'; }}
       >
         Contact Sales →
       </a>

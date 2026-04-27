@@ -141,11 +141,11 @@ const FactorRow = ({
             <span style={{ fontSize: '0.7rem', color: 'var(--navy-400)' }}>max {maxPoints} pts</span>
           </div>
           {/* Progress bar */}
-          <div style={{ height: 5, background: '#f1f5f9', borderRadius: 99, overflow: 'hidden' }}>
+          <div style={{ height: 5, background: 'var(--navy-100)', borderRadius: 99, overflow: 'hidden' }}>
             <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 99, transition: 'width 0.6s ease' }} />
           </div>
           {tip && (
-            <p style={{ margin: '6px 0 0', fontSize: '0.72rem', color: 'var(--navy-500)', background: '#f8fafc', borderRadius: 7, padding: '6px 10px', border: '1px solid #e2e8f0' }}>
+            <p style={{ margin: '6px 0 0', fontSize: '0.72rem', color: 'var(--navy-500)', background: 'var(--navy-50)', borderRadius: 7, padding: '6px 10px', border: '1px solid var(--navy-200)' }}>
               {description}
             </p>
           )}
@@ -270,7 +270,7 @@ const CreditScore: React.FC = () => {
             maxPoints={300}
             color="#64748b"
             Icon={SparklesIcon}
-            description="All ShipmeHub accounts start with a base score of 300 points."
+            description="All Label Flow accounts start with a base score of 300 points."
           />
           <FactorRow
             label="Account Age"
@@ -325,8 +325,8 @@ const CreditScore: React.FC = () => {
           </div>
           {creditLimit === 0 && (
             <span style={{
-              background: '#fef3c7', border: '1px solid #fde68a',
-              color: '#92400e', fontSize: '0.68rem', fontWeight: 800,
+              background: 'var(--warning-100)', border: '1px solid var(--warning-100)',
+              color: 'var(--warning-600)', fontSize: '0.68rem', fontWeight: 800,
               padding: '4px 10px', borderRadius: 99,
             }}>
               Not Activated
@@ -334,8 +334,8 @@ const CreditScore: React.FC = () => {
           )}
           {creditLimit > 0 && (
             <span style={{
-              background: '#dcfce7', border: '1px solid #bbf7d0',
-              color: '#166534', fontSize: '0.68rem', fontWeight: 800,
+              background: 'var(--success-100)', border: '1px solid var(--success-100)',
+              color: 'var(--success-700)', fontSize: '0.68rem', fontWeight: 800,
               padding: '4px 10px', borderRadius: 99,
             }}>
               Active
@@ -345,13 +345,13 @@ const CreditScore: React.FC = () => {
 
         {creditLimit === 0 ? (
           <div style={{
-            background: '#fffbeb', border: '1px solid #fde68a',
+            background: 'var(--warning-50)', border: '1px solid var(--warning-100)',
             borderRadius: 12, padding: '1.25rem',
           }}>
-            <p style={{ margin: '0 0 6px', fontSize: '0.85rem', fontWeight: 700, color: '#92400e' }}>
+            <p style={{ margin: '0 0 6px', fontSize: '0.85rem', fontWeight: 700, color: 'var(--warning-600)' }}>
               Credit not yet activated
             </p>
-            <p style={{ margin: '0 0 1rem', fontSize: '0.78rem', color: '#b45309', lineHeight: 1.55 }}>
+            <p style={{ margin: '0 0 1rem', fontSize: '0.78rem', color: 'var(--warning-600)', lineHeight: 1.55 }}>
               Your credit score qualifies you to apply for a credit facility. Contact your account manager to request activation.
               Once approved, you can generate labels even when your balance is $0 — up to your credit limit.
             </p>
@@ -381,7 +381,7 @@ const CreditScore: React.FC = () => {
                   borderRadius: 12, padding: '1rem',
                   textAlign: 'center',
                 }}>
-                  <p style={{ margin: '0 0 4px', fontSize: '0.68rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</p>
+                  <p style={{ margin: '0 0 4px', fontSize: '0.68rem', fontWeight: 700, color: 'var(--navy-500)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</p>
                   <p style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: c }}>{value}</p>
                 </div>
               ))}
@@ -395,7 +395,7 @@ const CreditScore: React.FC = () => {
                   {creditPct.toFixed(1)}%
                 </span>
               </div>
-              <div style={{ height: 8, background: '#f1f5f9', borderRadius: 99, overflow: 'hidden' }}>
+              <div style={{ height: 8, background: 'var(--navy-100)', borderRadius: 99, overflow: 'hidden' }}>
                 <div style={{
                   width: `${creditPct}%`, height: '100%', borderRadius: 99,
                   background: creditPct > 80
@@ -425,7 +425,7 @@ const CreditScore: React.FC = () => {
             { q: 'How do I increase my limit?', a: 'Contact your account manager. Limits are reviewed based on your credit score and shipping history.' },
             { q: 'What happens if I exceed my limit?', a: 'Label generation will pause until you recharge. We will notify you when you are approaching your limit.' },
           ].map(({ q, a }) => (
-            <div key={q} style={{ background: '#f8fafc', borderRadius: 10, padding: '0.875rem 1rem' }}>
+            <div key={q} style={{ background: 'var(--navy-50)', border: '1px solid var(--navy-200)', borderRadius: 10, padding: '0.875rem 1rem' }}>
               <p style={{ margin: '0 0 4px', fontSize: '0.78rem', fontWeight: 700, color: 'var(--navy-700)' }}>{q}</p>
               <p style={{ margin: 0, fontSize: '0.73rem', color: 'var(--navy-500)', lineHeight: 1.5 }}>{a}</p>
             </div>
@@ -445,7 +445,7 @@ const CreditScore: React.FC = () => {
           <a
             href="mailto:support@shipmehub.com?subject=Credit Score Inquiry"
             style={{
-              background: '#f1f5f9', border: '1px solid #e2e8f0', color: 'var(--navy-600)',
+              background: 'var(--navy-100)', border: '1px solid var(--navy-200)', color: 'var(--navy-600)',
               padding: '0.6rem 1.25rem', borderRadius: 8, fontWeight: 600,
               fontSize: '0.78rem', textDecoration: 'none',
             }}

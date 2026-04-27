@@ -37,7 +37,7 @@ function getTransporter() {
 async function sendMail({ to, subject, html }) {
   const transporter = getTransporter();
   await transporter.sendMail({
-    from: `"ShipmeHub" <${process.env.EMAIL_USER}>`,
+    from: `"Label Flow" <${process.env.EMAIL_USER}>`,
     to,
     subject,
     html,

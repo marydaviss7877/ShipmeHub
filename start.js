@@ -1,7 +1,7 @@
 const { spawn } = require('child_process');
 const path = require('path');
 
-console.log('🚀 Starting USPS Label Portal...\n');
+console.log('🚀 Starting Label Flow...\n');
 
 // Start backend server
 console.log('📦 Starting backend server...');

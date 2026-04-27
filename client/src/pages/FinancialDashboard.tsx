@@ -131,7 +131,7 @@ const PieTooltip = ({ active, payload }: any) => {
   if (active && payload?.length) {
     const d = payload[0];
     return (
-      <div style={{ background: '#fff', border: '1px solid var(--navy-150)', borderRadius: 8, padding: '0.5rem 0.75rem', boxShadow: 'var(--shadow-sm)', fontSize: '0.78rem' }}>
+      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--navy-200)', borderRadius: 8, padding: '0.5rem 0.75rem', boxShadow: 'var(--shadow-sm)', fontSize: '0.78rem' }}>
         <div style={{ fontWeight: 700, color: 'var(--navy-800)' }}>{d.name}</div>
         <div style={{ color: d.payload.color }}>{d.value.toLocaleString()} labels</div>
       </div>
@@ -277,12 +277,12 @@ const FinancialDashboard: React.FC = () => {
 
       {/* ── KPI Strip ──────────────────────────────────────────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr) repeat(3, 1fr)', gap: '0.5rem' }}>
-        <KpiTile label="Total Revenue"   value={fmtPKR(kpis.totalRevenuePKR)}     sub={fmt$(kpis.totalRevenueUSD)} accent="#15803d" bg="#f0fdf4" border="#bbf7d0" />
-        <KpiTile label="Net Profit"      value={fmtPKR(kpis.netProfitPKR)}        accent={netPositive ? '#15803d' : '#dc2626'} bg={netPositive ? '#f0fdf4' : '#fff1f2'} border={netPositive ? '#bbf7d0' : '#fecdd3'} />
-        <KpiTile label="Total Labels"    value={kpis.totalLabels.toLocaleString()} accent="#1d4ed8" bg="#eff6ff" border="#bfdbfe" />
-        <KpiTile label="Paid Labels Est" value={kpis.paidLabels.toLocaleString()}  accent="#4338ca" bg="#eef2ff" border="#c7d2fe" />
-        <KpiTile label="Vendor Cost"     value={fmtPKR(kpis.totalVendorCostPKR)}  accent="#dc2626" bg="#fff1f2" border="#fecdd3" />
-        <KpiTile label="Other Expenses"  value={fmtPKR(kpis.totalExpensesPKR)}    accent="#c2410c" bg="#fff7ed" border="#fed7aa" />
+        <KpiTile label="Total Revenue"   value={fmtPKR(kpis.totalRevenuePKR)}     sub={fmt$(kpis.totalRevenueUSD)} accent="#15803d" bg="var(--success-50)" border="var(--success-100)" />
+        <KpiTile label="Net Profit"      value={fmtPKR(kpis.netProfitPKR)}        accent={netPositive ? '#15803d' : '#dc2626'} bg={netPositive ? 'var(--success-50)' : 'var(--danger-50)'} border={netPositive ? 'var(--success-100)' : 'var(--danger-100)'} />
+        <KpiTile label="Total Labels"    value={kpis.totalLabels.toLocaleString()} accent="#1d4ed8" bg="var(--accent-50)" border="var(--accent-100)" />
+        <KpiTile label="Paid Labels Est" value={kpis.paidLabels.toLocaleString()}  accent="#4338ca" bg="var(--accent-50)" border="var(--accent-100)" />
+        <KpiTile label="Vendor Cost"     value={fmtPKR(kpis.totalVendorCostPKR)}  accent="#dc2626" bg="var(--danger-50)" border="var(--danger-100)" />
+        <KpiTile label="Other Expenses"  value={fmtPKR(kpis.totalExpensesPKR)}    accent="#c2410c" bg="var(--warning-50)" border="var(--warning-100)" />
       </div>
 
       {/* ── P&L Waterfall + Revenue by Source ──────────────────────────────── */}
@@ -321,8 +321,8 @@ const FinancialDashboard: React.FC = () => {
           <SectionLabel>Revenue by Source</SectionLabel>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
             {([
-              { key: 'organic', label: 'Organic',  color: '#15803d', bg: '#f0fdf4', border: '#bbf7d0', costLabel: 'Ad Spend' },
-              { key: 'paidAds', label: 'Paid Ads', color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe', costLabel: 'Ad Spend' },
+              { key: 'organic', label: 'Organic',  color: '#15803d', bg: 'var(--success-50)', border: 'var(--success-100)', costLabel: 'Ad Spend' },
+              { key: 'paidAds', label: 'Paid Ads', color: '#1d4ed8', bg: 'var(--accent-50)', border: 'var(--accent-100)', costLabel: 'Ad Spend' },
             ] as const).map(({ key, label, color, bg, border, costLabel }) => {
               const s = revenueBySource[key];
               const margin = s.revenuePKR > 0 ? ((s.profitPKR / s.revenuePKR) * 100) : 0;
@@ -331,7 +331,7 @@ const FinancialDashboard: React.FC = () => {
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                     <span style={{ fontSize: '0.72rem', fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</span>
                     <span style={{ fontSize: '0.68rem', fontWeight: 700, color: s.profitPKR >= 0 ? '#15803d' : '#dc2626',
-                      background: s.profitPKR >= 0 ? '#dcfce7' : '#fee2e2', padding: '1px 6px', borderRadius: 10 }}>
+                      background: s.profitPKR >= 0 ? 'var(--success-100)' : 'var(--danger-100)', padding: '1px 6px', borderRadius: 10 }}>
                       {margin.toFixed(1)}% margin
                     </span>
                   </div>
@@ -562,7 +562,7 @@ const FinancialDashboard: React.FC = () => {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
                 {partners.map(p => (
-                  <div key={p._id} style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff', border: '1px solid var(--navy-100)', borderRadius: 8, padding: '0.625rem 0.875rem' }}>
+                  <div key={p._id} style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'var(--bg-card)', border: '1px solid var(--navy-100)', borderRadius: 8, padding: '0.625rem 0.875rem' }}>
                     <div style={{ flex: 1 }}>
                       <span style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--navy-800)' }}>{p.name}</span>
                       <span style={{ fontSize: '0.75rem', color: 'var(--accent-600)', marginLeft: 8 }}>{p.ownershipPercent}%</span>

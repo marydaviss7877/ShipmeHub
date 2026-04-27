@@ -1,6 +1,6 @@
 /* ============================================================
-   ShipmeHub — Design System
-   Premium Shipping Label Portal
+   Label Flow — Design System
+   Premium Shipping Label Flow
    ============================================================ */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
@@ -71,6 +71,10 @@
 
   /* Typography */
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --text-min-ui: 0.75rem; /* accessibility floor for micro UI text */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
 
   /* Shadows */
   --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
@@ -94,6 +98,23 @@
   --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+html[data-theme='dark'] {
+  --navy-950: #f8fafc;
+  --navy-900: #e2e8f0;
+  --navy-800: #cbd5e1;
+  --navy-700: #94a3b8;
+  --navy-600: #64748b;
+  --navy-500: #475569;
+  --navy-400: #334155;
+  --navy-300: #1f2937;
+  --navy-200: #1e293b;
+  --navy-100: #172033;
+  --navy-50:  #0f172a;
+  --bg-page: #020617;
+  --bg-card: #0b1220;
+  --shadow-card: 0 0 0 1px rgb(148 163 184 / 0.16), 0 10px 28px -8px rgb(0 0 0 / 0.7);
+}
+
 /* ── Global Reset & Base ───────────────────────────────────── */
 * { box-sizing: border-box; }
 
@@ -103,6 +124,7 @@ body {
   color: var(--navy-900);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color var(--transition-base), color var(--transition-base);
 }
 
 /* ── Primary Color Utilities (backward compat) ─────────────── */
@@ -158,13 +180,75 @@ body {
 .to-primary-800 { --tw-gradient-to: var(--accent-800) !important; }
 .to-primary-900 { --tw-gradient-to: var(--accent-900) !important; }
 
-/* ── Shipmehub Card ─────────────────────────────────────────── */
+/* ── Label Flow Card ─────────────────────────────────────────── */
 .sh-card {
   background: var(--bg-card);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-card);
   border: 1px solid rgba(0,0,0,0.04);
 }
+
+html[data-theme='dark'] .sh-card,
+html[data-theme='dark'] .metric-card,
+html[data-theme='dark'] .modal-box,
+html[data-theme='dark'] .top-bar,
+html[data-theme='dark'] .topbar-user-chip {
+  background: var(--bg-card) !important;
+  border-color: rgba(148,163,184,0.22) !important;
+}
+
+html[data-theme='dark'] .top-bar {
+  box-shadow: 0 1px 0 rgba(148,163,184,0.12), 0 8px 24px rgba(0,0,0,0.35);
+}
+
+html[data-theme='dark'] .main-content,
+html[data-theme='dark'] .page-content,
+html[data-theme='dark'] .auth-form-panel {
+  background: var(--bg-page) !important;
+}
+
+html[data-theme='dark'] .btn-ghost {
+  color: var(--navy-800);
+  border-color: rgba(148,163,184,0.35);
+  background: rgba(148,163,184,0.06);
+}
+
+html[data-theme='dark'] .btn-ghost:hover:not(:disabled) {
+  background: rgba(148,163,184,0.12);
+  border-color: rgba(148,163,184,0.55);
+}
+
+html[data-theme='dark'] .form-input,
+html[data-theme='dark'] .form-select {
+  background: #0b1220 !important;
+  border-color: rgba(148,163,184,0.35) !important;
+  color: #e2e8f0 !important;
+}
+
+html[data-theme='dark'] .sh-table thead {
+  background: #0f172a;
+}
+
+html[data-theme='dark'] .sh-table th {
+  border-bottom-color: rgba(148,163,184,0.25);
+}
+
+html[data-theme='dark'] .sh-table td {
+  border-bottom-color: rgba(148,163,184,0.15);
+}
+
+html[data-theme='dark'] .sh-table tbody tr:hover {
+  background: rgba(148,163,184,0.08);
+}
+
+html[data-theme='dark'] .empty-state {
+  color: var(--navy-700);
+}
+
+html[data-theme='dark'] .alert-success { background: rgba(6, 95, 70, 0.24); color: #6ee7b7; border-color: rgba(110,231,183,0.35); }
+html[data-theme='dark'] .alert-danger  { background: rgba(127, 29, 29, 0.28); color: #fca5a5; border-color: rgba(252,165,165,0.35); }
+html[data-theme='dark'] .alert-warning { background: rgba(120, 53, 15, 0.25); color: #fcd34d; border-color: rgba(252,211,77,0.35); }
+html[data-theme='dark'] .alert-info    { background: rgba(30, 58, 138, 0.25); color: #93c5fd; border-color: rgba(147,197,253,0.35); }
 
 /* ── KPI / Metric Cards ─────────────────────────────────────── */
 .metric-card {
@@ -228,14 +312,14 @@ body {
   display: inline-flex; align-items: center; gap: 5px;
   padding: 4px 10px;
   border-radius: var(--radius-full);
-  font-size: 0.75rem;
+  font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.04em;
 }
 .carrier-badge.usps  { background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE; }
 .carrier-badge.ups   { background: #FFFBEB; color: #92400E; border: 1px solid #FDE68A; }
 .carrier-badge.fedex { background: #F5F3FF; color: #5B21B6; border: 1px solid #DDD6FE; }
-.carrier-badge.dhl   { background: #FEF3C7; color: #78350F; border: 1px solid #FDE68A; }
+.carrier-badge.dhl   { background: #FEF3C7; color: #7C2D12; border: 1px solid #FDE68A; }
 
 /* ── Buttons ─────────────────────────────────────────────────── */
 .btn {
@@ -250,6 +334,10 @@ body {
   white-space: nowrap;
 }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn:focus-visible {
+  outline: 2px solid var(--accent-500);
+  outline-offset: 2px;
+}
 
 .btn-primary {
   background: linear-gradient(135deg, var(--accent-600), var(--accent-500));
@@ -338,17 +426,17 @@ body {
 .sh-table th {
   padding: 0.75rem 1rem;
   text-align: left;
-  font-size: 0.72rem;
+  font-size: 0.76rem;
   font-weight: 700;
-  color: var(--navy-500);
+  color: var(--navy-600);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   border-bottom: 1px solid var(--navy-100);
 }
 .sh-table td {
   padding: 0.875rem 1rem;
-  font-size: 0.875rem;
-  color: var(--navy-800);
+  font-size: 0.9rem;
+  color: var(--navy-700);
   border-bottom: 1px solid var(--navy-50);
 }
 .sh-table tbody tr {
@@ -600,6 +688,73 @@ body {
   padding: 2rem;
 }
 
+/* ── Typography Utilities (Accessibility Guardrails) ────────── */
+.text-xs { font-size: var(--text-xs) !important; }
+.text-sm { font-size: var(--text-sm) !important; }
+.text-md { font-size: var(--text-md) !important; }
+
+/* Keep common micro-UI elements at or above accessible minimum */
+.badge,
+.carrier-badge {
+  font-size: max(var(--text-min-ui), 0.72rem);
+}
+.btn-sm {
+  font-size: max(var(--text-min-ui), 0.8rem);
+}
+
+.theme-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--navy-200);
+  background: var(--bg-card);
+  color: var(--navy-800);
+  font-size: 0.8rem;
+  font-weight: 700;
+  box-shadow: var(--shadow-card);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.theme-toggle-btn.compact {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  justify-content: center;
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+.theme-toggle-btn:hover {
+  transform: translateY(-1px);
+  border-color: var(--accent-400);
+}
+
+.theme-toggle-btn:focus-visible {
+  outline: 2px solid var(--accent-500);
+  outline-offset: 2px;
+}
+
+.theme-toggle-floating {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 12000;
+}
+
+/* ── Dashboard Layout Helpers ────────────────────────────────── */
+.dashboard-kpi-grid {
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+}
+.dashboard-two-col-grid {
+  grid-template-columns: 1fr 1fr;
+}
+.vendor-rate-grid {
+  grid-template-columns: minmax(180px, 1fr) minmax(220px, 1.5fr);
+}
+
 /* ── Page Header ─────────────────────────────────────────────── */
 .page-header {
   margin-bottom: 1.75rem;
@@ -739,10 +894,16 @@ body {
   .page-content { padding: 1rem; }
   .top-bar { padding: 0.75rem 1rem; }
   .topbar-user-chip { display: none; }
+  .dashboard-two-col-grid { grid-template-columns: 1fr; }
+  .vendor-rate-grid { grid-template-columns: 1fr; }
   /* Force all links visible on mobile */
   .sidebar-link.icon-only { justify-content: flex-start; padding: 0.48rem 0.9rem; margin: 1px 8px; }
   .nav-label { display: block !important; }
   .nav-active-dot { display: block !important; }
+}
+
+@media (max-width: 1024px) {
+  .dashboard-two-col-grid { grid-template-columns: 1fr; }
 }
 
 /* ── Auth Pages ──────────────────────────────────────────────── */

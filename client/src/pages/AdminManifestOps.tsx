@@ -6,7 +6,8 @@ import {
   ArrowDownTrayIcon, PlusIcon, TrashIcon, FunnelIcon,
 } from '@heroicons/react/24/outline';
 
-const API = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+const API = process.env.REACT_APP_API_URL
+  || (window.location.hostname === 'localhost' ? 'http://localhost:5001/api' : '/api');
 
 const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
   pending:      { label: 'Pending',           color: '#64748b', bg: '#f1f5f9' },

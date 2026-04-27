@@ -173,7 +173,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (token) {
         try {
           dispatch({ type: 'AUTH_START' });
-          const response = await axios.get('/auth/me');
+          const response = await axios.get('/auth/me', { timeout: 8000 });
           dispatch({
             type: 'AUTH_SUCCESS',
             payload: {

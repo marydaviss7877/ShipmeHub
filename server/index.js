@@ -1,5 +1,5 @@
 const startTime = Date.now();
-console.log('⏳ Starting ShipmeHub server…');
+console.log('⏳ Starting Label Flow server…');
 
 const express    = require('express');
 const cors       = require('cors');

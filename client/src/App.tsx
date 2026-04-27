@@ -8,6 +8,7 @@ import Layout from './components/Layout';
 import VendorLayout from './components/VendorLayout';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
+import LandingProxy from './pages/LandingProxy';
 import Dashboard from './pages/Dashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import UserManagement from './pages/UserManagement';
@@ -34,6 +35,7 @@ import FinancialDashboard  from './pages/FinancialDashboard';
 import Settings            from './pages/Settings';
 import Packages            from './pages/Packages';
 import CreditScore         from './pages/CreditScore';
+import { ThemeProvider } from './contexts/ThemeContext';
 import './App.css';
 
 // Shorthand wrappers to keep JSX clean
@@ -46,11 +48,12 @@ const AdminOrReseller = ({ children }: { children: React.ReactNode }) => (
 
 function App() {
   return (
-    <AuthProvider>
-      <SocketProvider>
-        <VendorAuthProvider>
-          <Router>
-            <div className="App">
+    <ThemeProvider>
+      <AuthProvider>
+        <SocketProvider>
+          <VendorAuthProvider>
+            <Router>
+              <div className="App">
               <Routes>
                 {/* Public routes */}
                 <Route path="/login"  element={<Login />} />
@@ -65,53 +68,55 @@ function App() {
                   <Route path="earnings"  element={<VendorEarnings />} />
                 </Route>
 
-                {/* ── Main portal (ShipmeHub users) ─────────────────────── */}
-                <Route path="/" element={
+                {/* Public home page (keep URL as /) */}
+                <Route path="/" element={<LandingProxy />} />
+
+                {/* ── Main portal (Label Flow users) ─────────────────────── */}
+                <Route element={
                   <ProtectedRoute>
                     <Layout />
                   </ProtectedRoute>
                 }>
-                  <Route index element={<Navigate to="/dashboard" replace />} />
-
                   {/* All authenticated users */}
-                  <Route path="dashboard"           element={<Dashboard />} />
-                  <Route path="profile"             element={<Profile />} />
-                  <Route path="announcements"       element={<Announcements />} />
-                  <Route path="labels/single"       element={<LabelGenerator />} />
-                  <Route path="labels/bulk"         element={<BulkLabelGenerator />} />
-                  <Route path="labels/history"      element={<LabelHistory />} />
-                  <Route path="labels/bulk-history" element={<BulkLabels />} />
-                  <Route path="manifest/upload"     element={<Navigate to="/labels/bulk" replace />} />
-                  <Route path="manifest/history"    element={<ManifestHistory />} />
-                  <Route path="activity"            element={<LiveActivity />} />
-                  <Route path="packages"            element={<Packages />} />
-                  <Route path="credit"              element={<CreditScore />} />
+                  <Route path="/dashboard"           element={<Dashboard />} />
+                  <Route path="/profile"             element={<Profile />} />
+                  <Route path="/announcements"       element={<Announcements />} />
+                  <Route path="/labels/single"       element={<LabelGenerator />} />
+                  <Route path="/labels/bulk"         element={<BulkLabelGenerator />} />
+                  <Route path="/labels/history"      element={<LabelHistory />} />
+                  <Route path="/labels/bulk-history" element={<BulkLabels />} />
+                  <Route path="/manifest/upload"     element={<Navigate to="/labels/bulk" replace />} />
+                  <Route path="/manifest/history"    element={<ManifestHistory />} />
+                  <Route path="/activity"            element={<LiveActivity />} />
+                  <Route path="/packages"            element={<Packages />} />
+                  <Route path="/credit"              element={<CreditScore />} />
 
                   {/* Admin-only routes */}
-                  <Route path="admin"                         element={<AdminOnly><AdminDashboard /></AdminOnly>} />
-                  <Route path="admin/users"                   element={<AdminOnly><UserManagement /></AdminOnly>} />
-                  <Route path="admin/users/:userId/access"    element={<AdminOnly><UserVendorAccess /></AdminOnly>} />
-                  <Route path="admin/vendors"                 element={<AdminOnly><VendorManagement /></AdminOnly>} />
-                  <Route path="admin/manifest"                element={<AdminOnly><AdminManifestOps /></AdminOnly>} />
-                  <Route path="admin/finance"                 element={<AdminOnly><Finance /></AdminOnly>} />
-                  <Route path="admin/cashbook"               element={<AdminOnly><CashBook /></AdminOnly>} />
-                  <Route path="admin/financial-dashboard"    element={<AdminOnly><FinancialDashboard /></AdminOnly>} />
-                  <Route path="admin/settings"              element={<AdminOnly><Settings /></AdminOnly>} />
-                  <Route path="admin/live"                 element={<AdminOnly><AdminLiveActivity /></AdminOnly>} />
+                  <Route path="/admin"                         element={<AdminOnly><AdminDashboard /></AdminOnly>} />
+                  <Route path="/admin/users"                   element={<AdminOnly><UserManagement /></AdminOnly>} />
+                  <Route path="/admin/users/:userId/access"    element={<AdminOnly><UserVendorAccess /></AdminOnly>} />
+                  <Route path="/admin/vendors"                 element={<AdminOnly><VendorManagement /></AdminOnly>} />
+                  <Route path="/admin/manifest"                element={<AdminOnly><AdminManifestOps /></AdminOnly>} />
+                  <Route path="/admin/finance"                 element={<AdminOnly><Finance /></AdminOnly>} />
+                  <Route path="/admin/cashbook"                element={<AdminOnly><CashBook /></AdminOnly>} />
+                  <Route path="/admin/financial-dashboard"     element={<AdminOnly><FinancialDashboard /></AdminOnly>} />
+                  <Route path="/admin/settings"                element={<AdminOnly><Settings /></AdminOnly>} />
+                  <Route path="/admin/live"                    element={<AdminOnly><AdminLiveActivity /></AdminOnly>} />
 
                   {/* Reseller routes (admin can also access) */}
-                  <Route path="reseller/clients"  element={<AdminOrReseller><ResellerClients /></AdminOrReseller>} />
-                  <Route path="reseller/finance"  element={<AdminOrReseller><Finance /></AdminOrReseller>} />
+                  <Route path="/reseller/clients" element={<AdminOrReseller><ResellerClients /></AdminOrReseller>} />
+                  <Route path="/reseller/finance" element={<AdminOrReseller><Finance /></AdminOrReseller>} />
                 </Route>
 
-                {/* Catch all → landing page */}
-                <Route path="*" element={<Navigate to="/landing.html" replace />} />
+                {/* Catch all → root domain */}
+                <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </div>
-          </Router>
-        </VendorAuthProvider>
-      </SocketProvider>
-    </AuthProvider>
+            </Router>
+          </VendorAuthProvider>
+        </SocketProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 

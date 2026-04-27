@@ -72,20 +72,20 @@ const PdfModal: React.FC<{ url: string; trackingId: string; onClose: () => void 
   <div
     onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(2,6,23,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.25rem', backdropFilter: 'blur(4px)' }}>
-    <div style={{ background: '#fff', borderRadius: 16, overflow: 'hidden', width: '100%', maxWidth: 740, height: '92vh', display: 'flex', flexDirection: 'column', boxShadow: '0 32px 80px rgba(0,0,0,0.45)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.875rem 1.125rem', borderBottom: '1px solid #E2E8F0', background: '#F8FAFC', flexShrink: 0 }}>
+    <div style={{ background: 'var(--bg-card)', borderRadius: 16, overflow: 'hidden', width: '100%', maxWidth: 740, height: '92vh', display: 'flex', flexDirection: 'column', boxShadow: '0 32px 80px rgba(0,0,0,0.45)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.875rem 1.125rem', borderBottom: '1px solid var(--navy-200)', background: 'var(--navy-50)', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ width: 28, height: 28, borderRadius: 7, background: 'linear-gradient(135deg,#6366f1,#818cf8)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <EyeIcon style={{ width: 14, height: 14, color: '#fff' }} />
           </div>
           <div>
-            <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0F172A' }}>Label Preview</div>
-            {trackingId && <div style={{ fontSize: '0.68rem', fontFamily: 'monospace', color: '#64748B', marginTop: 1 }}>{trackingId}</div>}
+            <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--navy-900)' }}>Label Preview</div>
+            {trackingId && <div style={{ fontSize: '0.68rem', fontFamily: 'monospace', color: 'var(--navy-500)', marginTop: 1 }}>{trackingId}</div>}
           </div>
         </div>
-        <button onClick={onClose} style={{ background: '#F1F5F9', border: 'none', cursor: 'pointer', width: 30, height: 30, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B', transition: 'background 0.15s' }}
-          onMouseEnter={e => (e.currentTarget.style.background = '#E2E8F0')}
-          onMouseLeave={e => (e.currentTarget.style.background = '#F1F5F9')}>
+        <button onClick={onClose} style={{ background: 'var(--navy-100)', border: 'none', cursor: 'pointer', width: 30, height: 30, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--navy-500)', transition: 'background 0.15s' }}
+          onMouseEnter={e => (e.currentTarget.style.background = 'var(--navy-200)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'var(--navy-100)')}>
           <XMarkIcon style={{ width: 15, height: 15 }} />
         </button>
       </div>
@@ -240,8 +240,8 @@ const LabelHistory: React.FC = () => {
         </div>
 
         {/* Summary pills + Track All */}
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7, background: '#fff', border: '1.5px solid #E2E8F0', borderRadius: 10, padding: '6px 14px' }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--bg-card)', border: '1.5px solid var(--navy-200)', borderRadius: 10, padding: '6px 14px' }}>
             <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#6366f1' }} />
             <span style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: 600 }}>Total</span>
             <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0F172A' }}>{total}</span>
@@ -274,20 +274,20 @@ const LabelHistory: React.FC = () => {
       </div>
 
       {/* ── Filter toolbar ── */}
-      <div style={{ background: '#fff', borderRadius: 12, border: '1.5px solid #E2E8F0', overflow: 'hidden' }}>
+      <div style={{ background: 'var(--bg-card)', borderRadius: 12, border: '1.5px solid var(--navy-200)', overflow: 'hidden' }}>
 
         {/* Top row: search + date toggle + clear */}
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '0.625rem 0.875rem', borderBottom: '1px solid #F1F5F9' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '0.625rem 0.875rem', borderBottom: '1px solid var(--navy-100)' }}>
           <div style={{ flex: 1, position: 'relative', minWidth: 180 }}>
-            <MagnifyingGlassIcon style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, color: '#94A3B8', pointerEvents: 'none' }} />
+            <MagnifyingGlassIcon style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, color: 'var(--navy-400)', pointerEvents: 'none' }} />
             <input
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Search name, tracking ID, email…"
-              style={{ width: '100%', boxSizing: 'border-box', height: 36, paddingLeft: 32, paddingRight: 12, border: '1.5px solid #E2E8F0', borderRadius: 8, fontSize: '0.8rem', color: '#1E293B', outline: 'none', background: '#F8FAFC', transition: 'border-color 0.15s' }}
+              style={{ width: '100%', boxSizing: 'border-box', height: 36, paddingLeft: 32, paddingRight: 12, border: '1.5px solid var(--navy-200)', borderRadius: 8, fontSize: '0.8rem', color: 'var(--navy-800)', outline: 'none', background: 'var(--navy-50)', transition: 'border-color 0.15s' }}
               onFocus={e => (e.target.style.borderColor = '#6366f1')}
-              onBlur={e => (e.target.style.borderColor = '#E2E8F0')}
+              onBlur={e => (e.target.style.borderColor = 'var(--navy-200)')}
             />
           </div>
 
@@ -296,7 +296,7 @@ const LabelHistory: React.FC = () => {
             <select
               value={vendorF}
               onChange={e => { setVendorF(e.target.value); setPage(1); }}
-              style={{ height: 36, paddingLeft: 10, paddingRight: 28, border: '1.5px solid #E2E8F0', borderRadius: 8, fontSize: '0.78rem', color: '#1E293B', background: '#F8FAFC', cursor: 'pointer', outline: 'none', appearance: 'none', backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%2394A3B8' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center', backgroundSize: 16 }}>
+              style={{ height: 36, paddingLeft: 10, paddingRight: 28, border: '1.5px solid var(--navy-200)', borderRadius: 8, fontSize: '0.78rem', color: 'var(--navy-800)', background: 'var(--navy-50)', cursor: 'pointer', outline: 'none', appearance: 'none', backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%2394A3B8' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center', backgroundSize: 16 }}>
               <option value="">All Vendors</option>
               {vendorOptions.map(v => <option key={v._id} value={v._id}>{v.name}</option>)}
             </select>
@@ -304,7 +304,7 @@ const LabelHistory: React.FC = () => {
 
           <button
             onClick={() => setShowDateFilter(o => !o)}
-            style={{ height: 36, display: 'flex', alignItems: 'center', gap: 5, padding: '0 12px', border: `1.5px solid ${showDateFilter || dateFrom || dateTo ? '#6366f1' : '#E2E8F0'}`, borderRadius: 8, background: showDateFilter || dateFrom || dateTo ? '#EEF2FF' : '#F8FAFC', color: showDateFilter || dateFrom || dateTo ? '#4F46E5' : '#64748B', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s' }}>
+            style={{ height: 36, display: 'flex', alignItems: 'center', gap: 5, padding: '0 12px', border: `1.5px solid ${showDateFilter || dateFrom || dateTo ? '#6366f1' : 'var(--navy-200)'}`, borderRadius: 8, background: showDateFilter || dateFrom || dateTo ? '#EEF2FF' : 'var(--navy-50)', color: showDateFilter || dateFrom || dateTo ? '#4F46E5' : 'var(--navy-500)', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s' }}>
             <CalendarDaysIcon style={{ width: 13, height: 13 }} />
             Date
             {(dateFrom || dateTo) && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#6366f1', display: 'inline-block' }} />}
@@ -318,7 +318,7 @@ const LabelHistory: React.FC = () => {
         </div>
 
         {/* Carrier tabs */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 0, padding: '0 0.875rem', borderBottom: '1px solid #F1F5F9', overflowX: 'auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 0, padding: '0 0.875rem', borderBottom: '1px solid var(--navy-100)', overflowX: 'auto' }}>
           {['', ...CARRIERS].map(c => {
             const active = carrierF === c;
             const theme = c ? CC[c] : null;
@@ -329,7 +329,7 @@ const LabelHistory: React.FC = () => {
                 style={{
                   padding: '0.5rem 0.875rem', border: 'none', background: 'transparent',
                   fontSize: '0.75rem', fontWeight: active ? 700 : 500,
-                  color: active ? (theme?.color ?? '#4F46E5') : '#64748B',
+                  color: active ? (theme?.color ?? '#4F46E5') : 'var(--navy-500)',
                   borderBottom: `2px solid ${active ? (theme?.accent ?? '#6366f1') : 'transparent'}`,
                   cursor: 'pointer', whiteSpace: 'nowrap',
                   transition: 'all 0.15s', marginBottom: -1,
@@ -342,20 +342,20 @@ const LabelHistory: React.FC = () => {
 
         {/* Date range row */}
         {showDateFilter && (
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '0.625rem 0.875rem', background: '#FAFBFC' }}>
-            <CalendarDaysIcon style={{ width: 14, height: 14, color: '#94A3B8', flexShrink: 0 }} />
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '0.625rem 0.875rem', background: 'var(--navy-50)' }}>
+            <CalendarDaysIcon style={{ width: 14, height: 14, color: 'var(--navy-400)', flexShrink: 0 }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <label style={{ fontSize: '0.72rem', fontWeight: 600, color: '#64748B', whiteSpace: 'nowrap' }}>From</label>
+              <label style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--navy-500)', whiteSpace: 'nowrap' }}>From</label>
               <input type="date" value={dateFrom} max={dateTo || undefined}
                 onChange={e => { setDateFrom(e.target.value); setPage(1); }}
-                style={{ height: 32, padding: '0 8px', border: '1.5px solid #E2E8F0', borderRadius: 7, fontSize: '0.78rem', color: '#1E293B', background: '#fff', outline: 'none' }} />
-              <ArrowRightIcon style={{ width: 12, height: 12, color: '#CBD5E1' }} />
-              <label style={{ fontSize: '0.72rem', fontWeight: 600, color: '#64748B', whiteSpace: 'nowrap' }}>To</label>
+                style={{ height: 32, padding: '0 8px', border: '1.5px solid var(--navy-200)', borderRadius: 7, fontSize: '0.78rem', color: 'var(--navy-800)', background: 'var(--bg-card)', outline: 'none' }} />
+              <ArrowRightIcon style={{ width: 12, height: 12, color: 'var(--navy-300)' }} />
+              <label style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--navy-500)', whiteSpace: 'nowrap' }}>To</label>
               <input type="date" value={dateTo} min={dateFrom || undefined}
                 onChange={e => { setDateTo(e.target.value); setPage(1); }}
-                style={{ height: 32, padding: '0 8px', border: '1.5px solid #E2E8F0', borderRadius: 7, fontSize: '0.78rem', color: '#1E293B', background: '#fff', outline: 'none' }} />
+                style={{ height: 32, padding: '0 8px', border: '1.5px solid var(--navy-200)', borderRadius: 7, fontSize: '0.78rem', color: 'var(--navy-800)', background: 'var(--bg-card)', outline: 'none' }} />
               {(dateFrom || dateTo) && (
-                <button onClick={() => { setDateFrom(''); setDateTo(''); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex', padding: 2 }}>
+                <button onClick={() => { setDateFrom(''); setDateTo(''); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--navy-400)', display: 'flex', padding: 2 }}>
                   <XMarkIcon style={{ width: 13, height: 13 }} />
                 </button>
               )}
@@ -365,13 +365,13 @@ const LabelHistory: React.FC = () => {
       </div>
 
       {/* ── Table card ── */}
-      <div style={{ background: '#fff', borderRadius: 12, border: '1.5px solid #E2E8F0', overflow: 'hidden' }}>
+      <div style={{ background: 'var(--bg-card)', borderRadius: 12, border: '1.5px solid var(--navy-200)', overflow: 'hidden' }}>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
             <thead>
-              <tr style={{ background: '#F8FAFC' }}>
+              <tr style={{ background: 'var(--navy-50)' }}>
                 {['#', 'Tracking & Carrier', 'Route', 'User', 'Vendor', 'Price', 'Date', 'Actions'].map(h => (
-                  <th key={h} style={{ padding: '0.625rem 0.875rem', textAlign: 'left', fontSize: '0.63rem', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.07em', whiteSpace: 'nowrap', borderBottom: '1.5px solid #E2E8F0' }}>
+                  <th key={h} style={{ padding: '0.625rem 0.875rem', textAlign: 'left', fontSize: '0.63rem', fontWeight: 700, color: 'var(--navy-400)', textTransform: 'uppercase', letterSpacing: '0.07em', whiteSpace: 'nowrap', borderBottom: '1.5px solid var(--navy-200)' }}>
                     {h}
                   </th>
                 ))}
@@ -407,8 +407,8 @@ const LabelHistory: React.FC = () => {
 
                   return (
                     <tr key={label._id}
-                      style={{ borderBottom: '1px solid #F1F5F9', transition: 'background 0.12s', position: 'relative' }}
-                      onMouseEnter={e => (e.currentTarget.style.background = '#FAFBFF')}
+                      style={{ borderBottom: '1px solid var(--navy-100)', transition: 'background 0.12s', position: 'relative' }}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--navy-50)')}
                       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
 
                       {/* # */}
@@ -435,9 +435,9 @@ const LabelHistory: React.FC = () => {
                             target="_blank"
                             rel="noopener noreferrer"
                             title="Track this shipment"
-                            style={{ fontFamily: 'monospace', fontSize: '0.73rem', color: '#1E293B', fontWeight: 600, textDecoration: 'none', display: 'block', maxWidth: 155, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                            style={{ fontFamily: 'monospace', fontSize: '0.73rem', color: 'var(--navy-800)', fontWeight: 600, textDecoration: 'none', display: 'block', maxWidth: 155, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                             onMouseEnter={e => (e.currentTarget.style.color = theme.color)}
-                            onMouseLeave={e => (e.currentTarget.style.color = '#1E293B')}
+                            onMouseLeave={e => (e.currentTarget.style.color = 'var(--navy-800)')}
                           >
                             {label.trackingId}
                           </a>
@@ -532,29 +532,29 @@ const LabelHistory: React.FC = () => {
                               <button
                                 onClick={e => { e.stopPropagation(); setOpenAction(isMenuOpen ? null : label._id); }}
                                 title="PDF options"
-                                style={{ height: 30, width: 30, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: '1.5px solid #E2E8F0', borderRadius: 7, background: isMenuOpen ? '#F1F5F9' : '#fff', color: '#64748B', cursor: 'pointer', transition: 'all 0.15s' }}
-                                onMouseEnter={e => { e.currentTarget.style.background = '#F1F5F9'; e.currentTarget.style.borderColor = '#CBD5E1'; }}
-                                onMouseLeave={e => { if (!isMenuOpen) { e.currentTarget.style.background = '#fff'; e.currentTarget.style.borderColor = '#E2E8F0'; } }}>
+                                style={{ height: 30, width: 30, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: '1.5px solid var(--navy-200)', borderRadius: 7, background: isMenuOpen ? 'var(--navy-100)' : 'var(--bg-card)', color: 'var(--navy-500)', cursor: 'pointer', transition: 'all 0.15s' }}
+                                onMouseEnter={e => { e.currentTarget.style.background = 'var(--navy-100)'; e.currentTarget.style.borderColor = 'var(--navy-300)'; }}
+                                onMouseLeave={e => { if (!isMenuOpen) { e.currentTarget.style.background = 'var(--bg-card)'; e.currentTarget.style.borderColor = 'var(--navy-200)'; } }}>
                                 <FunnelIcon style={{ width: 13, height: 13 }} />
                               </button>
 
                               {isMenuOpen && (
                                 <div
                                   onClick={e => e.stopPropagation()}
-                                  style={{ position: 'absolute', right: 0, top: 'calc(100% + 5px)', background: '#fff', border: '1.5px solid #E2E8F0', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 100, minWidth: 150, overflow: 'hidden' }}>
+                                  style={{ position: 'absolute', right: 0, top: 'calc(100% + 5px)', background: 'var(--bg-card)', border: '1.5px solid var(--navy-200)', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 100, minWidth: 150, overflow: 'hidden' }}>
                                   <button
                                     onClick={() => { openPdf(label); setOpenAction(null); }}
-                                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '0.625rem 0.875rem', border: 'none', background: 'none', cursor: 'pointer', fontSize: '0.78rem', color: '#1E293B', fontWeight: 600, textAlign: 'left', transition: 'background 0.12s' }}
-                                    onMouseEnter={e => (e.currentTarget.style.background = '#F8FAFC')}
+                                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '0.625rem 0.875rem', border: 'none', background: 'none', cursor: 'pointer', fontSize: '0.78rem', color: 'var(--navy-800)', fontWeight: 600, textAlign: 'left', transition: 'background 0.12s' }}
+                                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--navy-50)')}
                                     onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
                                     <EyeIcon style={{ width: 14, height: 14, color: '#64748B', flexShrink: 0 }} />
                                     View PDF
                                   </button>
-                                  <div style={{ height: 1, background: '#F1F5F9', margin: '0 0.625rem' }} />
+                                  <div style={{ height: 1, background: 'var(--navy-100)', margin: '0 0.625rem' }} />
                                   <button
                                     onClick={() => { downloadLabelPdf(label._id, label.trackingId); setOpenAction(null); }}
-                                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '0.625rem 0.875rem', border: 'none', background: 'none', cursor: 'pointer', fontSize: '0.78rem', color: '#1E293B', fontWeight: 600, textAlign: 'left', transition: 'background 0.12s' }}
-                                    onMouseEnter={e => (e.currentTarget.style.background = '#F8FAFC')}
+                                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '0.625rem 0.875rem', border: 'none', background: 'none', cursor: 'pointer', fontSize: '0.78rem', color: 'var(--navy-800)', fontWeight: 600, textAlign: 'left', transition: 'background 0.12s' }}
+                                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--navy-50)')}
                                     onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
                                     <ArrowDownTrayIcon style={{ width: 14, height: 14, color: '#64748B', flexShrink: 0 }} />
                                     Download PDF
@@ -575,9 +575,9 @@ const LabelHistory: React.FC = () => {
 
         {/* ── Pagination ── */}
         {!isLoading && totalPages > 1 && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', borderTop: '1.5px solid #F1F5F9', background: '#FAFBFC' }}>
-            <span style={{ fontSize: '0.72rem', color: '#94A3B8', fontWeight: 500 }}>
-              Showing {(page - 1) * 35 + 1}–{Math.min(page * 35, total)} of <strong style={{ color: '#475569' }}>{total}</strong> labels
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', borderTop: '1.5px solid var(--navy-100)', background: 'var(--navy-50)' }}>
+            <span style={{ fontSize: '0.72rem', color: 'var(--navy-400)', fontWeight: 500 }}>
+              Showing {(page - 1) * 35 + 1}–{Math.min(page * 35, total)} of <strong style={{ color: 'var(--navy-600)' }}>{total}</strong> labels
             </span>
             <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
               <button

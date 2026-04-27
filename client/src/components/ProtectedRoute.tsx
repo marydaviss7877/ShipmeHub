@@ -15,8 +15,33 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, roles }) => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-600"></div>
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexDirection: 'column',
+          gap: '12px',
+          background: '#f8fafc',
+          color: '#334155',
+          fontFamily: 'Inter, system-ui, sans-serif',
+        }}
+      >
+        <div
+          style={{
+            width: '36px',
+            height: '36px',
+            border: '3px solid #cbd5e1',
+            borderTopColor: '#2563eb',
+            borderRadius: '50%',
+            animation: 'spin 0.8s linear infinite',
+          }}
+        />
+        <div style={{ fontSize: '14px', fontWeight: 600 }}>Checking session...</div>
+        <style>
+          {`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}
+        </style>
       </div>
     );
   }

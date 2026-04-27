@@ -11,7 +11,8 @@ import {
   PlusIcon, ChevronDownIcon, ChevronUpIcon,
 } from '@heroicons/react/24/outline';
 
-const _API_BASE = (process.env.REACT_APP_API_URL || 'http://localhost:5001/api').replace(/\/api\/?$/, '');
+const _API_BASE = (process.env.REACT_APP_API_URL
+  || (window.location.hostname === 'localhost' ? 'http://localhost:5001/api' : '/api')).replace(/\/api\/?$/, '');
 const toAbsUrl = (p: string) => p.startsWith('http') ? p : `${_API_BASE}${p}`;
 
 interface User {

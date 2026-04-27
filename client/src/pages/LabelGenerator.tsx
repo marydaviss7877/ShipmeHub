@@ -53,8 +53,8 @@ const saveWarehouses  = (wh: Warehouse[]) => localStorage.setItem(WH_KEY, JSON.s
 
 // ── Field label style (shared) ────────────────────────────────
 const fieldLabel: React.CSSProperties = {
-  fontSize: '0.68rem', fontWeight: 600,
-  color: 'var(--navy-500)',               // darker than before — readable
+  fontSize: '0.74rem', fontWeight: 600,
+  color: 'var(--navy-600)',               // darker than before — readable
   letterSpacing: '0.03em',
   marginBottom: 3,
 };
@@ -77,7 +77,7 @@ const F: React.FC<{
         width: '100%', boxSizing: 'border-box',
         padding: '0.35rem 0.5rem', fontSize: '0.82rem',
         border: '1px solid var(--navy-200)', borderRadius: 5,
-        background: '#fff', color: 'var(--navy-900)',
+        background: 'var(--bg-card)', color: 'var(--navy-900)',
         outline: 'none', transition: 'border-color 0.15s',
         fontFamily: 'inherit', lineHeight: 1.4, fontWeight: 400,
       }}
@@ -97,7 +97,7 @@ const StateSelect: React.FC<{ name: string; value: string; onChange: React.Chang
         width: '100%', boxSizing: 'border-box',
         padding: '0.35rem 0.4rem', fontSize: '0.82rem',
         border: '1px solid var(--navy-200)', borderRadius: 5,
-        background: '#fff', color: 'var(--navy-900)',
+        background: 'var(--bg-card)', color: 'var(--navy-900)',
         outline: 'none', cursor: 'pointer', fontFamily: 'inherit',
       }}
     >
@@ -329,7 +329,7 @@ const LabelGenerator: React.FC = () => {
                     style={{
                       padding: '5px 16px', borderRadius: 9, height: 52,
                       border: `2px solid ${isSelected ? cfg.solid : 'var(--navy-200)'}`,
-                      background: isSelected ? cfg.light : '#fff',
+                      background: isSelected ? cfg.light : 'var(--bg-card)',
                       cursor: 'pointer', transition: 'all 0.15s',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       boxShadow: isSelected
@@ -364,7 +364,7 @@ const LabelGenerator: React.FC = () => {
                 flex: 1, minWidth: 160, maxWidth: 260,
                 padding: '4px 8px', fontSize: '0.78rem', fontWeight: 500,
                 border: '1px solid var(--navy-200)', borderRadius: 5,
-                background: '#fff', color: selectedVendorId ? 'var(--navy-900)' : 'var(--navy-400)',
+                background: 'var(--bg-card)', color: selectedVendorId ? 'var(--navy-900)' : 'var(--navy-500)',
                 outline: 'none', cursor: 'pointer', fontFamily: 'inherit',
               }}
             >
@@ -406,13 +406,13 @@ const LabelGenerator: React.FC = () => {
             {/* Return badge */}
             {isReturn && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#1D4ED8', background: '#EFF6FF', border: '1px solid #BFDBFE', padding: '2px 7px', borderRadius: 10 }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#1D4ED8', background: '#EFF6FF', border: '1px solid #BFDBFE', padding: '2px 7px', borderRadius: 10 }}>
                   ↩ Return
                 </span>
                 <button
                   type="button"
                   onClick={() => { setIsReturn(false); setForm(BLANK_FORM); setSelectedCarrier(''); setSelectedVendorId(''); }}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--navy-400)', fontSize: '0.7rem', padding: '2px 4px' }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--navy-500)', fontSize: '0.75rem', padding: '2px 4px' }}
                 >
                   Clear
                 </button>
@@ -439,7 +439,7 @@ const LabelGenerator: React.FC = () => {
                     border: `1px solid ${showWhPanel ? 'var(--accent-200)' : 'var(--navy-200)'}`,
                     borderRadius: 5, padding: '2px 7px',
                     cursor: 'pointer', color: 'var(--navy-500)',
-                    fontSize: '0.68rem', fontWeight: 600,
+                    fontSize: '0.74rem', fontWeight: 600,
                     transition: 'all 0.12s',
                   }}
                 >
@@ -452,17 +452,17 @@ const LabelGenerator: React.FC = () => {
                 {showWhPanel && (
                   <div style={{
                     position: 'absolute', top: 'calc(100% + 4px)', right: 0, zIndex: 50,
-                    background: '#fff', border: '1px solid var(--navy-200)',
+                    background: 'var(--bg-card)', border: '1px solid var(--navy-200)',
                     borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
                     width: 280, padding: '0.625rem',
                   }}>
-                    <div style={{ fontSize: '0.62rem', fontWeight: 700, color: 'var(--navy-400)', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
+                    <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--navy-500)', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
                       Saved Warehouses
                     </div>
 
                     {/* Warehouse list */}
                     {warehouses.length === 0 ? (
-                      <div style={{ fontSize: '0.75rem', color: 'var(--navy-400)', padding: '0.375rem 0', marginBottom: '0.5rem' }}>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--navy-500)', padding: '0.375rem 0', marginBottom: '0.5rem' }}>
                         No warehouses saved yet.
                       </div>
                     ) : (
@@ -476,7 +476,7 @@ const LabelGenerator: React.FC = () => {
                             <BuildingOfficeIcon style={{ width: 13, height: 13, color: 'var(--accent-500)', flexShrink: 0 }} />
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--navy-800)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{wh.label}</div>
-                              <div style={{ fontSize: '0.65rem', color: 'var(--navy-400)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              <div style={{ fontSize: '0.72rem', color: 'var(--navy-500)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                 {wh.address1}, {wh.city}, {wh.state}
                               </div>
                             </div>
@@ -501,7 +501,7 @@ const LabelGenerator: React.FC = () => {
 
                     {/* Save current FROM */}
                     <div style={{ borderTop: '1px solid var(--navy-100)', paddingTop: '0.5rem' }}>
-                      <div style={{ fontSize: '0.62rem', fontWeight: 700, color: 'var(--navy-400)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 4 }}>Save current FROM</div>
+                      <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--navy-500)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 4 }}>Save current FROM</div>
                       <div style={{ display: 'flex', gap: 4 }}>
                         <input
                           type="text"
@@ -560,7 +560,7 @@ const LabelGenerator: React.FC = () => {
                 transform: 'translate(-50%, -50%)',
                 width: 28, height: 28, borderRadius: '50%',
                 background: canSwap ? 'var(--accent-600)' : '#e2e8f0',
-                border: '2.5px solid #fff',
+                border: '2.5px solid var(--bg-card)',
                 cursor: canSwap ? 'pointer' : 'default',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 zIndex: 2,
@@ -619,7 +619,7 @@ const LabelGenerator: React.FC = () => {
                   width: '100%', boxSizing: 'border-box',
                   padding: '0.32rem 0.5rem', fontSize: '0.8rem',
                   border: '1px solid var(--navy-200)', borderRadius: 5,
-                  background: '#fff', color: 'var(--navy-900)',
+                  background: 'var(--bg-card)', color: 'var(--navy-900)',
                   outline: 'none', fontFamily: 'inherit',
                 }}
                 onFocus={e => (e.target.style.borderColor = 'var(--accent-400)')}
@@ -633,7 +633,7 @@ const LabelGenerator: React.FC = () => {
                 display: 'flex', alignItems: 'center', gap: 6,
                 padding: '0.38rem 1.1rem', borderRadius: 6, border: 'none',
                 background: canSubmit ? (activeCfg ? activeCfg.solid : 'var(--accent-600)') : 'var(--navy-200)',
-                color: canSubmit ? '#fff' : 'var(--navy-400)',
+                color: canSubmit ? '#fff' : 'var(--navy-500)',
                 fontSize: '0.8rem', fontWeight: 700, cursor: canSubmit ? 'pointer' : 'not-allowed',
                 whiteSpace: 'nowrap', transition: 'background 0.15s',
                 boxShadow: canSubmit ? '0 1px 4px rgba(0,0,0,0.2)' : 'none',
@@ -652,8 +652,8 @@ const LabelGenerator: React.FC = () => {
             <div style={{
               display: 'flex', alignItems: 'center', gap: 8,
               padding: '0.45rem 0.875rem',
-              background: error ? '#fff1f2' : '#f0fdf4',
-              borderTop: `1px solid ${error ? '#fecdd3' : '#bbf7d0'}`,
+              background: error ? 'var(--danger-50)' : 'var(--success-50)',
+              borderTop: `1px solid ${error ? 'var(--danger-100)' : 'var(--success-100)'}`,
             }}>
               {error
                 ? <ExclamationCircleIcon style={{ width: 14, height: 14, color: '#dc2626', flexShrink: 0 }} />

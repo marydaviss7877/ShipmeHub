@@ -43,7 +43,7 @@ const VendorLogin: React.FC = () => {
           }}>
             <BriefcaseIcon style={{ width: 26, height: 26, color: '#94a3b8' }} />
           </div>
-          <h1 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#f1f5f9', margin: 0 }}>Label Portal</h1>
+          <h1 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#f1f5f9', margin: 0 }}>Label Flow</h1>
           <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem', marginTop: 4 }}>Vendor Access</p>
         </div>
 

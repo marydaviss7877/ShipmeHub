@@ -64,7 +64,7 @@ const vendorSchema = new mongoose.Schema({
   },
 
   // ── Vendor Portal Credentials ─────────────────────────────
-  // Vendors log into a separate neutral portal (no ShipmeHub branding)
+  // Vendors log into a separate neutral portal (no Label Flow branding)
   vendorPortalEmail:    { type: String, unique: true, sparse: true, lowercase: true, trim: true },
   vendorPortalPassword: { type: String, select: false },
   vendorPortalIsActive: { type: Boolean, default: false },
@@ -73,7 +73,7 @@ const vendorSchema = new mongoose.Schema({
   vendorContactEmail: { type: String, default: '' },
 
   // ── Vendor Finance ────────────────────────────────────────
-  // Per-label rate ShipmeHub owes this vendor for manifested jobs
+  // Per-label rate Label Flow owes this vendor for manifested jobs
   vendorRate:      { type: Number, default: 0, min: 0 },
   // Running payable balance (added when admin approves a job)
   dueBalance:      { type: Number, default: 0 },

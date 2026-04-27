@@ -348,12 +348,12 @@ const BulkLabelGenerator: React.FC = () => {
           ].map(({ val, label, color }) => (
             <div key={label} style={{ padding: '0.875rem', background: 'var(--navy-50)', borderRadius: 10, textAlign: 'center' }}>
               <div style={{ fontSize: '1.5rem', fontWeight: 800, color }}>{val}</div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--navy-500)', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 2 }}>{label}</div>
+              <div style={{ fontSize: '0.76rem', color: 'var(--navy-600)', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 2 }}>{label}</div>
             </div>
           ))}
         </div>
         <div style={{ background: 'var(--navy-50)', borderRadius: 8, padding: '0.75rem 1.25rem', display: 'flex', gap: 10, width: '100%', maxWidth: 480 }}>
-          <span style={{ fontSize: '0.72rem', color: 'var(--navy-400)', textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0 }}>Job ID</span>
+          <span style={{ fontSize: '0.75rem', color: 'var(--navy-500)', textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0 }}>Job ID</span>
           <span style={{ fontFamily: 'monospace', fontSize: '0.82rem', color: 'var(--navy-700)', wordBreak: 'break-all' }}>{manifestResult.manifestJobId}</span>
         </div>
       </div>
@@ -397,7 +397,7 @@ const BulkLabelGenerator: React.FC = () => {
           : 0;
         const cards = [
           { val: apiResult.results.filter(r => r.success).length,  label: 'Generated', color: 'var(--success-600)' },
-          { val: apiResult.results.filter(r => !r.success).length, label: 'Failed',    color: apiResult.results.filter(r => !r.success).length > 0 ? 'var(--danger-600)' : 'var(--navy-400)' },
+          { val: apiResult.results.filter(r => !r.success).length, label: 'Failed',    color: apiResult.results.filter(r => !r.success).length > 0 ? 'var(--danger-600)' : 'var(--navy-500)' },
           { val: `$${apiResult.newBalance.toFixed(2)}`,            label: 'Remaining', color: 'var(--accent-600)' },
           ...(successSavings > 0 ? [{ val: `$${successSavings.toFixed(2)}`, label: 'Saved vs USPS', color: '#059669' }] : []),
         ];
@@ -566,7 +566,7 @@ const BulkLabelGenerator: React.FC = () => {
           {selectedCarrier && (
             <button
               className="btn btn-ghost btn-sm"
-              style={{ whiteSpace: 'nowrap', fontSize: '0.75rem', flexShrink: 0 }}
+              style={{ whiteSpace: 'nowrap', fontSize: '0.78rem', flexShrink: 0 }}
               onClick={() => downloadTemplate(selectedCarrier)}
             >
               <ArrowDownTrayIcon style={{ width: 13, height: 13 }} /> Template
@@ -581,7 +581,7 @@ const BulkLabelGenerator: React.FC = () => {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <DocumentTextIcon style={{ width: 15, height: 15, color: 'var(--accent-500)', flexShrink: 0 }} />
               <span style={{ fontWeight: 600, color: 'var(--navy-800)', fontSize: '0.82rem' }}>{fileName}</span>
-              <span style={{ fontSize: '0.75rem', color: 'var(--navy-400)' }}>{rows.length} rows</span>
+              <span style={{ fontSize: '0.78rem', color: 'var(--navy-500)' }}>{rows.length} rows</span>
               {headerMissing.length === 0 && Object.keys(rowErrors).length === 0 && rows.length > 0 && (
                 <span className="badge badge-green"><CheckCircleIcon style={{ width: 10, height: 10 }} />Valid</span>
               )}
@@ -618,11 +618,11 @@ const BulkLabelGenerator: React.FC = () => {
               onDrop={e => { if (!selectedVendor) return; handleFileDrop(e); }}
               onClick={() => { if (!selectedVendor) return; fileRef.current?.click(); }}
             >
-              <ArrowUpTrayIcon style={{ width: 16, height: 16, color: isDragging ? 'var(--accent-500)' : 'var(--navy-400)', flexShrink: 0 }} />
+              <ArrowUpTrayIcon style={{ width: 16, height: 16, color: isDragging ? 'var(--accent-500)' : 'var(--navy-500)', flexShrink: 0 }} />
               <span style={{ fontSize: '0.82rem', fontWeight: 500, color: isDragging ? 'var(--accent-700)' : 'var(--navy-600)' }}>
                 {!selectedVendor ? 'Select a vendor above to upload CSV' : isDragging ? 'Drop it!' : 'Drop CSV here or click to browse'}
               </span>
-              <span style={{ fontSize: '0.72rem', color: 'var(--navy-400)', marginLeft: 4 }}>.csv only</span>
+              <span style={{ fontSize: '0.75rem', color: 'var(--navy-500)', marginLeft: 4 }}>.csv only</span>
               <input ref={fileRef} type="file" accept=".csv" style={{ display: 'none' }} onChange={handleFileInput} />
             </div>
           )}
@@ -636,10 +636,10 @@ const BulkLabelGenerator: React.FC = () => {
         <div className="sh-card" style={{ overflow: 'hidden' }}>
           {/* Table toolbar */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.625rem 1rem', borderBottom: '1px solid var(--navy-100)' }}>
-            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--navy-500)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--navy-600)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
               Review & Edit
             </span>
-            <span style={{ fontSize: '0.75rem', color: 'var(--navy-400)' }}>{rows.length} row{rows.length !== 1 ? 's' : ''}</span>
+            <span style={{ fontSize: '0.78rem', color: 'var(--navy-500)' }}>{rows.length} row{rows.length !== 1 ? 's' : ''}</span>
             {Object.keys(rowErrors).length > 0
               ? <span className="badge badge-red"><ExclamationCircleIcon style={{ width: 10, height: 10 }} />{Object.keys(rowErrors).length} error{Object.keys(rowErrors).length !== 1 ? 's' : ''}</span>
               : <span className="badge badge-green"><CheckCircleIcon style={{ width: 10, height: 10 }} />All valid</span>
@@ -654,9 +654,9 @@ const BulkLabelGenerator: React.FC = () => {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
               <thead>
                 <tr style={{ background: 'var(--navy-50)', borderBottom: '1px solid var(--navy-100)' }}>
-                  <th style={{ padding: '0.4rem 0.5rem', textAlign: 'left', fontWeight: 700, color: 'var(--navy-500)', fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.04em', width: 32 }}>#</th>
+                  <th style={{ padding: '0.4rem 0.5rem', textAlign: 'left', fontWeight: 700, color: 'var(--navy-600)', fontSize: '0.74rem', textTransform: 'uppercase', letterSpacing: '0.04em', width: 32 }}>#</th>
                   {TABLE_COLS.map(col => (
-                    <th key={col.key} style={{ padding: '0.4rem 0.5rem', textAlign: 'left', fontWeight: 700, color: 'var(--navy-500)', fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap', minWidth: col.width }}>
+                    <th key={col.key} style={{ padding: '0.4rem 0.5rem', textAlign: 'left', fontWeight: 700, color: 'var(--navy-600)', fontSize: '0.74rem', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap', minWidth: col.width }}>
                       {col.label}{col.required && <span style={{ color: 'var(--danger-400)', marginLeft: 2 }}>*</span>}
                     </th>
                   ))}
@@ -669,7 +669,7 @@ const BulkLabelGenerator: React.FC = () => {
                   const hasRowError = errs.length > 0;
                   return (
                     <tr key={rowIdx} style={{ borderBottom: '1px solid var(--navy-50)', background: hasRowError ? 'rgba(239,68,68,0.025)' : 'transparent' }}>
-                      <td style={{ padding: '0.25rem 0.5rem', color: 'var(--navy-400)', fontWeight: 600, fontSize: '0.72rem', verticalAlign: 'middle' }}>
+                      <td style={{ padding: '0.25rem 0.5rem', color: 'var(--navy-500)', fontWeight: 600, fontSize: '0.75rem', verticalAlign: 'middle' }}>
                         {hasRowError
                           ? <ExclamationCircleIcon style={{ width: 13, height: 13, color: 'var(--danger-400)' }} title={errs.join(', ')} />
                           : rowIdx + 1}
@@ -687,7 +687,7 @@ const BulkLabelGenerator: React.FC = () => {
                               style={{
                                 width: col.width, padding: '0.28rem 0.45rem',
                                 border: cellError ? '1.5px solid var(--danger-400)' : '1.5px solid var(--navy-200)',
-                                borderRadius: 6, fontSize: '0.77rem',
+                                borderRadius: 6, fontSize: '0.8rem',
                                 fontFamily: 'var(--font-sans)', color: 'var(--navy-900)',
                                 background: cellError ? 'rgba(239,68,68,0.04)' : '#fff',
                                 outline: 'none', transition: 'border-color 0.15s',
@@ -719,7 +719,7 @@ const BulkLabelGenerator: React.FC = () => {
             <button className="btn btn-ghost btn-sm" onClick={addRow}>
               <PlusIcon style={{ width: 12, height: 12 }} /> Add Row
             </button>
-            <span style={{ fontSize: '0.72rem', color: 'var(--navy-400)' }}>Click any cell to edit · red = required field missing</span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--navy-500)' }}>Click any cell to edit · red = required field missing</span>
           </div>
         </div>
       )}

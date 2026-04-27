@@ -5,7 +5,7 @@ import axios from 'axios';
 import {
   CurrencyDollarIcon, TagIcon, ClipboardDocumentListIcon,
   UserGroupIcon, ArrowUpRightIcon, ClockIcon, SparklesIcon,
-  InformationCircleIcon, ArrowTrendingUpIcon,
+  InformationCircleIcon, ArrowTrendingUpIcon, ChevronDownIcon,
 } from '@heroicons/react/24/outline';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -16,6 +16,17 @@ interface UserStats {
   savings: { total: number; labelCount: number };
   recentLabels:   any[];
   activeManifests: any[];
+}
+
+interface VendorAccessItem {
+  vendorId: string;
+  vendorName: string;
+  carrier: string;
+  vendorType: 'api' | 'manifest';
+  shippingService: string;
+  baseRate: number;
+  isAllowed: boolean;
+  rateTiers: Array<{ minLbs: number; maxLbs: number | null; rate: number }>;
 }
 
 interface ResellerStats {
@@ -72,15 +83,14 @@ const MetricCard = ({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        background: '#fff',
+        background: 'var(--bg-card)',
         borderRadius: 16,
         padding: '1.25rem 1.3rem 1.1rem',
         display: 'flex', flexDirection: 'column',
         cursor: onClick ? 'pointer' : 'default',
         position: 'relative',
-        boxShadow: hovered
-          ? '0 8px 28px rgba(0,0,0,0.10), 0 0 0 1px rgba(0,0,0,0.04)'
-          : '0 1px 4px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.04)',
+        border: '1px solid rgba(148,163,184,0.22)',
+        boxShadow: hovered ? 'var(--shadow-lg)' : 'var(--shadow-card)',
         transform: hovered && onClick ? 'translateY(-2px)' : 'none',
         transition: 'box-shadow 0.2s, transform 0.2s',
       }}
@@ -137,7 +147,7 @@ const MetricCard = ({
 
       {/* Label */}
       <div style={{
-        fontSize: '0.68rem', fontWeight: 700, color: 'var(--navy-400)',
+        fontSize: '0.74rem', fontWeight: 700, color: 'var(--navy-500)',
         textTransform: 'uppercase', letterSpacing: '0.08em',
       }}>
         {label}
@@ -148,7 +158,7 @@ const MetricCard = ({
         <div style={{
           marginTop: 10, paddingTop: 10,
           borderTop: '1px solid var(--navy-100)',
-          fontSize: '0.7rem', color: 'var(--navy-400)',
+          fontSize: '0.76rem', color: 'var(--navy-500)',
         }}>
           {sub}
         </div>
@@ -171,7 +181,7 @@ const QuickAction = ({ label, sub, Icon, color, onClick }: {
         display: 'flex', alignItems: 'center', gap: 13,
         padding: '0.9rem 1rem', borderRadius: 12,
         border: `1.5px solid ${hovered ? color + '55' : 'var(--navy-100)'}`,
-        background: hovered ? `${color}08` : '#fff',
+        background: hovered ? `${color}08` : 'var(--bg-card)',
         cursor: 'pointer', textAlign: 'left', width: '100%',
         transition: 'all 0.15s',
         boxShadow: hovered ? `0 4px 14px ${color}22` : 'none',
@@ -187,7 +197,7 @@ const QuickAction = ({ label, sub, Icon, color, onClick }: {
       </div>
       <div style={{ flex: 1 }}>
         <div style={{ fontSize: '0.83rem', fontWeight: 700, color: 'var(--navy-800)' }}>{label}</div>
-        <div style={{ fontSize: '0.7rem', color: 'var(--navy-400)', marginTop: 1 }}>{sub}</div>
+        <div style={{ fontSize: '0.76rem', color: 'var(--navy-500)', marginTop: 1 }}>{sub}</div>
       </div>
       <ArrowUpRightIcon style={{
         width: 15, height: 15,
@@ -212,6 +222,72 @@ const SectionHeader = ({ title, action, accent = 'var(--accent-500)' }: {
     {action}
   </div>
 );
+
+const DashboardFAQ = () => {
+  const faqs = [
+    {
+      q: 'How do credits work?',
+      a: 'Credits are deducted per label based on template and weight. Your added credits are shown in the history table.',
+    },
+    {
+      q: 'How can I add more credits?',
+      a: 'Ask admin to add credits. It will instantly appear in "Added balance history".',
+    },
+    {
+      q: 'What if I run out of credits during bulk upload?',
+      a: 'Bulk generation should stop if balance is insufficient. Add credits and re-upload.',
+    },
+  ];
+
+  return (
+    <div className="sh-card" style={{ padding: '1.3rem 1.5rem' }}>
+      <SectionHeader title="Frequently asked questions" accent="var(--navy-300)" />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {faqs.map((faq) => (
+          <details
+            key={faq.q}
+            style={{
+              border: '1px solid var(--navy-200)',
+              borderRadius: 12,
+              background: 'var(--navy-50)',
+              overflow: 'hidden',
+            }}
+          >
+            <summary
+              style={{
+                listStyle: 'none',
+                cursor: 'pointer',
+                padding: '0.85rem 1rem',
+                fontSize: '0.82rem',
+                fontWeight: 700,
+                color: 'var(--navy-800)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 10,
+              }}
+            >
+              {faq.q}
+              <ChevronDownIcon style={{ width: 16, height: 16, color: 'var(--navy-500)', flexShrink: 0 }} />
+            </summary>
+            <div
+              style={{
+                padding: '0.7rem 1rem 0.9rem',
+                fontSize: '0.8rem',
+                color: 'var(--navy-600)',
+                lineHeight: 1.65,
+                borderTop: '1px solid var(--navy-200)',
+                background: 'var(--bg-card)',
+              }}
+            >
+              {faq.a}
+            </div>
+          </details>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 // ── Hero Banner (shared) ───────────────────────────────────────────────────────
 const HeroBanner = ({ greeting, name, dateLabel, balanceLabel, balance, onCta }: {
@@ -291,7 +367,8 @@ const AddBalanceModal = ({
       <div
         onClick={e => e.stopPropagation()}
         style={{
-          background: '#fff', borderRadius: 20, padding: '2rem 2.25rem',
+          background: 'var(--bg-card)', borderRadius: 20, padding: '2rem 2.25rem',
+          border: '1px solid var(--navy-200)',
           maxWidth: 440, width: '100%',
           boxShadow: '0 24px 60px rgba(0,0,0,0.18)',
         }}
@@ -307,7 +384,7 @@ const AddBalanceModal = ({
             </div>
             <div>
               <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--navy-800)' }}>Add Balance</h3>
-              <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--navy-400)' }}>Account top-up</p>
+              <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--navy-500)' }}>Account top-up</p>
             </div>
           </div>
           <button
@@ -318,13 +395,13 @@ const AddBalanceModal = ({
 
         {/* Message */}
         <div style={{
-          background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 12,
+          background: 'var(--success-50)', border: '1px solid var(--success-100)', borderRadius: 12,
           padding: '1rem 1.25rem', marginBottom: '1.25rem',
         }}>
-          <p style={{ margin: 0, fontSize: '0.87rem', color: '#166534', fontWeight: 600, marginBottom: 4 }}>
+          <p style={{ margin: 0, fontSize: '0.87rem', color: 'var(--success-700)', fontWeight: 600, marginBottom: 4 }}>
             Ready to recharge?
           </p>
-          <p style={{ margin: 0, fontSize: '0.82rem', color: '#15803d', lineHeight: 1.55 }}>
+          <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--success-700)', lineHeight: 1.55 }}>
             To add balance to your account, please contact your <strong>account manager</strong> or our <strong>sales team</strong>. They will process your top-up and confirm once funds are credited.
           </p>
         </div>
@@ -336,7 +413,7 @@ const AddBalanceModal = ({
             style={{
               display: 'flex', alignItems: 'center', gap: 12,
               padding: '0.75rem 1rem', borderRadius: 10,
-              background: '#f8fafc', border: '1px solid #e2e8f0',
+              background: 'var(--navy-50)', border: '1px solid var(--navy-200)',
               color: 'var(--navy-700)', textDecoration: 'none',
               fontSize: '0.82rem', fontWeight: 600,
             }}
@@ -350,8 +427,8 @@ const AddBalanceModal = ({
             style={{
               display: 'flex', alignItems: 'center', gap: 12,
               padding: '0.75rem 1rem', borderRadius: 10,
-              background: '#f0fdf4', border: '1px solid #bbf7d0',
-              color: '#166534', textDecoration: 'none',
+              background: 'var(--success-50)', border: '1px solid var(--success-100)',
+              color: 'var(--success-700)', textDecoration: 'none',
               fontSize: '0.82rem', fontWeight: 600,
             }}
           >
@@ -377,7 +454,7 @@ const AddBalanceModal = ({
             onClick={onClose}
             style={{
               flex: 1, padding: '0.65rem', borderRadius: 10,
-              background: '#f1f5f9', border: '1px solid #e2e8f0',
+              background: 'var(--navy-100)', border: '1px solid var(--navy-200)',
               color: 'var(--navy-600)', fontWeight: 600,
               fontSize: '0.82rem', cursor: 'pointer',
             }}
@@ -394,13 +471,18 @@ const AddBalanceModal = ({
 const UserDashboard: React.FC<{ firstName: string }> = ({ firstName }) => {
   const navigate = useNavigate();
   const [stats, setStats]           = useState<UserStats | null>(null);
+  const [vendorAccess, setVendorAccess] = useState<VendorAccessItem[]>([]);
   const [loading, setLoading]       = useState(true);
   const [showAddBalance, setShowAddBalance] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const res = await axios.get('/stats');
-      setStats(res.data);
+      const [statsRes, accessRes] = await Promise.all([
+        axios.get('/stats'),
+        axios.get('/access/me').catch(() => ({ data: { access: [] } })),
+      ]);
+      setStats(statsRes.data);
+      setVendorAccess((accessRes.data?.access || []).filter((v: VendorAccessItem) => v.isAllowed));
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   }, []);
@@ -417,6 +499,20 @@ const UserDashboard: React.FC<{ firstName: string }> = ({ firstName }) => {
   const now = new Date();
   const greeting  = now.getHours() < 12 ? 'Good morning' : now.getHours() < 17 ? 'Good afternoon' : 'Good evening';
   const dateLabel = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  const accessByCarrier = vendorAccess.reduce((acc, item) => {
+    if (!acc[item.carrier]) acc[item.carrier] = [];
+    acc[item.carrier].push(item);
+    return acc;
+  }, {} as Record<string, VendorAccessItem[]>);
+  const carrierOrder = ['USPS', 'UPS', 'FedEx', 'DHL'];
+  const sortedCarriers = Object.keys(accessByCarrier).sort((a, b) => {
+    const ai = carrierOrder.indexOf(a);
+    const bi = carrierOrder.indexOf(b);
+    if (ai === -1 && bi === -1) return a.localeCompare(b);
+    if (ai === -1) return 1;
+    if (bi === -1) return -1;
+    return ai - bi;
+  });
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -429,7 +525,7 @@ const UserDashboard: React.FC<{ firstName: string }> = ({ firstName }) => {
       />
 
       {/* KPI Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '0.875rem' }}>
+      <div className="dashboard-kpi-grid" style={{ display: 'grid', gap: '0.875rem' }}>
         <MetricCard label="Balance"          value={fmt$(balance.currentBalance)} sub={`${fmt$(balance.totalDeposited)} deposited`}                                       color="#22c55e" Icon={CurrencyDollarIcon}      onClick={() => navigate('/profile')} />
         <MetricCard label="Labels Generated" value={labels.generated}             sub={`${labels.failed} failed`}                                                         color="#0ea5e9" Icon={TagIcon}                 onClick={() => navigate('/labels/history')} />
         <MetricCard label="Active Manifests" value={manifests.active}             sub={`${manifests.completed} completed`}                                                color="#f59e0b" Icon={ClipboardDocumentListIcon} />
@@ -439,7 +535,7 @@ const UserDashboard: React.FC<{ firstName: string }> = ({ firstName }) => {
       </div>
 
       {/* Mid row */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+      <div className="dashboard-two-col-grid" style={{ display: 'grid', gap: '1rem' }}>
 
         {/* Labels by Carrier */}
         <div className="sh-card" style={{ padding: '1.3rem 1.5rem' }}>
@@ -452,7 +548,7 @@ const UserDashboard: React.FC<{ firstName: string }> = ({ firstName }) => {
                 <div key={c}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
                     <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--navy-600)' }}>{c}</span>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--navy-400)' }}>{count} · {pct}%</span>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--navy-500)' }}>{count} · {pct}%</span>
                   </div>
                   <div style={{ height: 6, background: 'var(--navy-100)', borderRadius: 99, overflow: 'hidden' }}>
                     <div style={{ width: `${pct}%`, height: '100%', background: CARRIER_GRADIENT[c] || CARRIER_COLORS[c], borderRadius: 99, transition: 'width 0.4s ease' }} />
@@ -462,7 +558,7 @@ const UserDashboard: React.FC<{ firstName: string }> = ({ firstName }) => {
             })}
           </div>
           <div style={{ marginTop: '1rem', paddingTop: '0.875rem', borderTop: '1px solid var(--navy-100)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.75rem', color: 'var(--navy-400)' }}>Total Labels</span>
+            <span style={{ fontSize: '0.78rem', color: 'var(--navy-500)' }}>Total Labels</span>
             <span style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--navy-800)' }}>{labels.total.toLocaleString()}</span>
           </div>
         </div>
@@ -479,7 +575,7 @@ const UserDashboard: React.FC<{ firstName: string }> = ({ firstName }) => {
             }
           />
           {activeManifests.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '1.75rem 0', color: 'var(--navy-400)', fontSize: '0.82rem' }}>
+            <div style={{ textAlign: 'center', padding: '1.75rem 0', color: 'var(--navy-500)', fontSize: '0.84rem' }}>
               No active jobs.{' '}
               <button onClick={() => navigate('/labels/bulk')} style={{ background: 'none', border: 'none', color: 'var(--accent-600)', cursor: 'pointer', fontWeight: 600 }}>
                 Submit one →
@@ -498,16 +594,16 @@ const UserDashboard: React.FC<{ firstName: string }> = ({ firstName }) => {
                     cursor: 'pointer', transition: 'background 0.12s, border-color 0.12s',
                     border: '1px solid transparent',
                   }}
-                  onMouseEnter={e => { const el = e.currentTarget as HTMLDivElement; el.style.background = '#eff6ff'; el.style.borderColor = '#bfdbfe'; }}
+                  onMouseEnter={e => { const el = e.currentTarget as HTMLDivElement; el.style.background = 'var(--navy-100)'; el.style.borderColor = 'var(--navy-200)'; }}
                   onMouseLeave={e => { const el = e.currentTarget as HTMLDivElement; el.style.background = 'var(--navy-50)'; el.style.borderColor = 'transparent'; }}
                 >
                   <span className={`carrier-badge ${job.carrier?.toLowerCase()}`} style={{ flexShrink: 0 }}>{job.carrier}</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--navy-800)' }}>{job.userBilling?.labelCount ?? '?'} labels</div>
-                    <div style={{ fontSize: '0.68rem', color: 'var(--navy-400)' }}>{job.assignedVendor?.name ?? 'Unassigned'}</div>
+                    <div style={{ fontSize: '0.74rem', color: 'var(--navy-500)' }}>{job.assignedVendor?.name ?? 'Unassigned'}</div>
                   </div>
                   <span style={{
-                    fontSize: '0.68rem', fontWeight: 700, padding: '3px 8px', borderRadius: 99,
+                    fontSize: '0.72rem', fontWeight: 700, padding: '3px 8px', borderRadius: 99,
                     background: `${MANIFEST_STATUS_COLOR[job.status] || '#94a3b8'}18`,
                     color: MANIFEST_STATUS_COLOR[job.status] || '#64748b',
                   }}>
@@ -518,6 +614,79 @@ const UserDashboard: React.FC<{ firstName: string }> = ({ firstName }) => {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Available Label Vendors */}
+      <div className="sh-card" style={{ padding: '1.3rem 1.5rem' }}>
+        <SectionHeader
+          title="Available Label Vendors"
+          accent="#0ea5e9"
+          action={
+            <button className="btn btn-ghost btn-sm" style={{ fontSize: '0.72rem' }} onClick={() => navigate('/labels/single')}>
+              Create Label →
+            </button>
+          }
+        />
+        {vendorAccess.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '1.5rem 0', color: 'var(--navy-500)', fontSize: '0.84rem' }}>
+            No vendors are currently enabled for your account.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {sortedCarriers.map((carrier) => (
+              <div key={carrier} style={{ border: '1px solid var(--navy-100)', borderRadius: 12, overflow: 'hidden' }}>
+                <div style={{ padding: '0.55rem 0.8rem', borderBottom: '1px solid var(--navy-100)', background: 'var(--navy-25)' }}>
+                  <span className={`carrier-badge ${carrier.toLowerCase()}`}>{carrier}</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  {accessByCarrier[carrier].map((vendor, idx) => (
+                    <div
+                      key={vendor.vendorId}
+                      style={{
+                        padding: '0.7rem 0.8rem',
+                        borderTop: idx === 0 ? 'none' : '1px solid var(--navy-50)',
+                        display: 'grid',
+                        gap: '0.75rem',
+                        alignItems: 'start',
+                      }}
+                      className="vendor-rate-grid"
+                    >
+                      <div>
+                        <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--navy-800)' }}>
+                          {vendor.vendorName}
+                          {vendor.vendorType === 'manifest' && (
+                            <span style={{ marginLeft: 6, fontSize: '0.7rem', color: 'var(--warning-600)', background: 'var(--warning-50)', border: '1px solid var(--warning-100)', borderRadius: 999, padding: '1px 6px' }}>
+                              Manifest
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--navy-600)', marginTop: 2 }}>
+                          {vendor.shippingService || 'Standard service'}
+                        </div>
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--navy-700)', lineHeight: 1.55 }}>
+                        {vendor.rateTiers?.length ? (
+                          vendor.rateTiers
+                            .slice()
+                            .sort((a, b) => a.minLbs - b.minLbs)
+                            .map((tier, tierIdx) => (
+                              <div key={`${vendor.vendorId}-${tierIdx}`}>
+                                {tier.minLbs}-{tier.maxLbs === null ? '∞' : tier.maxLbs} lbs: <strong>${tier.rate.toFixed(2)}</strong>
+                              </div>
+                            ))
+                        ) : (
+                          <div>
+                            All weights: <strong>${vendor.baseRate.toFixed(2)}</strong>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Recent Labels */}
@@ -549,13 +718,13 @@ const UserDashboard: React.FC<{ firstName: string }> = ({ firstName }) => {
                       {lbl.trackingId || '—'}
                     </td>
                     <td><span style={{ fontSize: '0.72rem', color: 'var(--navy-500)' }}>{lbl.isBulk ? 'Bulk' : 'Single'}</span></td>
-                    <td style={{ fontWeight: 600, color: lbl.price > 0 ? '#ef4444' : 'var(--navy-400)' }}>{lbl.price > 0 ? fmt$(lbl.price) : '—'}</td>
+                    <td style={{ fontWeight: 600, color: lbl.price > 0 ? '#dc2626' : 'var(--navy-500)' }}>{lbl.price > 0 ? fmt$(lbl.price) : '—'}</td>
                     <td style={{ fontSize: '0.78rem', color: 'var(--navy-500)', whiteSpace: 'nowrap' }}>{new Date(lbl.createdAt).toLocaleDateString()}</td>
                     <td>
                       <span style={{
                         fontSize: '0.7rem', fontWeight: 700, padding: '3px 9px', borderRadius: 99,
-                        background: lbl.status === 'generated' ? '#f0fdf4' : '#fef2f2',
-                        color:      lbl.status === 'generated' ? '#16a34a' : '#dc2626',
+                        background: lbl.status === 'generated' ? 'var(--success-50)' : 'var(--danger-50)',
+                        color:      lbl.status === 'generated' ? 'var(--success-700)' : 'var(--danger-600)',
                       }}>{lbl.status}</span>
                     </td>
                   </tr>
@@ -565,6 +734,9 @@ const UserDashboard: React.FC<{ firstName: string }> = ({ firstName }) => {
           </div>
         )}
       </div>
+
+      {/* Quick Actions */}
+      <DashboardFAQ />
 
       {/* Quick Actions */}
       <div className="sh-card" style={{ padding: '1.3rem 1.5rem' }}>
@@ -586,13 +758,18 @@ const UserDashboard: React.FC<{ firstName: string }> = ({ firstName }) => {
 const ResellerDashboard: React.FC<{ firstName: string }> = ({ firstName }) => {
   const navigate = useNavigate();
   const [stats, setStats]           = useState<ResellerStats | null>(null);
+  const [vendorAccess, setVendorAccess] = useState<VendorAccessItem[]>([]);
   const [loading, setLoading]       = useState(true);
   const [showAddBalance, setShowAddBalance] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const res = await axios.get('/stats');
-      setStats(res.data);
+      const [statsRes, accessRes] = await Promise.all([
+        axios.get('/stats'),
+        axios.get('/access/me').catch(() => ({ data: { access: [] } })),
+      ]);
+      setStats(statsRes.data);
+      setVendorAccess((accessRes.data?.access || []).filter((v: VendorAccessItem) => v.isAllowed));
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   }, []);
@@ -607,6 +784,20 @@ const ResellerDashboard: React.FC<{ firstName: string }> = ({ firstName }) => {
   const now = new Date();
   const greeting  = now.getHours() < 12 ? 'Good morning' : now.getHours() < 17 ? 'Good afternoon' : 'Good evening';
   const dateLabel = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  const accessByCarrier = vendorAccess.reduce((acc, item) => {
+    if (!acc[item.carrier]) acc[item.carrier] = [];
+    acc[item.carrier].push(item);
+    return acc;
+  }, {} as Record<string, VendorAccessItem[]>);
+  const carrierOrder = ['USPS', 'UPS', 'FedEx', 'DHL'];
+  const sortedCarriers = Object.keys(accessByCarrier).sort((a, b) => {
+    const ai = carrierOrder.indexOf(a);
+    const bi = carrierOrder.indexOf(b);
+    if (ai === -1 && bi === -1) return a.localeCompare(b);
+    if (ai === -1) return 1;
+    if (bi === -1) return -1;
+    return ai - bi;
+  });
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -619,7 +810,7 @@ const ResellerDashboard: React.FC<{ firstName: string }> = ({ firstName }) => {
       />
 
       {/* KPI Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '0.875rem' }}>
+      <div className="dashboard-kpi-grid" style={{ display: 'grid', gap: '0.875rem' }}>
         <MetricCard label="My Balance"    value={fmt$(myBalance.currentBalance)} sub={`${fmt$(myBalance.totalDeposited)} deposited`} color="#22c55e" Icon={CurrencyDollarIcon} onClick={() => navigate('/profile')} />
         <MetricCard label="Total Clients" value={clientCount}                    sub={`${activeClients} active`}                    color="#6366f1" Icon={UserGroupIcon}       onClick={() => navigate('/reseller/clients')} />
         <MetricCard label="Client Labels" value={labels.total}                   sub="Generated by clients"                         color="#0ea5e9" Icon={TagIcon} />
@@ -627,7 +818,7 @@ const ResellerDashboard: React.FC<{ firstName: string }> = ({ firstName }) => {
       </div>
 
       {/* Mid row */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+      <div className="dashboard-two-col-grid" style={{ display: 'grid', gap: '1rem' }}>
 
         {/* My Balance */}
         <div className="sh-card" style={{ padding: '1.3rem 1.5rem' }}>
@@ -658,7 +849,7 @@ const ResellerDashboard: React.FC<{ firstName: string }> = ({ firstName }) => {
                 <div key={c}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
                     <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--navy-600)' }}>{c}</span>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--navy-400)' }}>{count} · {pct}%</span>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--navy-500)' }}>{count} · {pct}%</span>
                   </div>
                   <div style={{ height: 6, background: 'var(--navy-100)', borderRadius: 99, overflow: 'hidden' }}>
                     <div style={{ width: `${pct}%`, height: '100%', background: CARRIER_GRADIENT[c] || CARRIER_COLORS[c], borderRadius: 99 }} />
@@ -681,6 +872,79 @@ const ResellerDashboard: React.FC<{ firstName: string }> = ({ firstName }) => {
             ))}
           </div>
         </div>
+      </div>
+
+      {/* Available Label Vendors */}
+      <div className="sh-card" style={{ padding: '1.3rem 1.5rem' }}>
+        <SectionHeader
+          title="Available Label Vendors"
+          accent="#0ea5e9"
+          action={
+            <button className="btn btn-ghost btn-sm" style={{ fontSize: '0.72rem' }} onClick={() => navigate('/labels/single')}>
+              Create Label →
+            </button>
+          }
+        />
+        {vendorAccess.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '1.5rem 0', color: 'var(--navy-500)', fontSize: '0.84rem' }}>
+            No vendors are currently enabled for your account.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {sortedCarriers.map((carrier) => (
+              <div key={carrier} style={{ border: '1px solid var(--navy-100)', borderRadius: 12, overflow: 'hidden' }}>
+                <div style={{ padding: '0.55rem 0.8rem', borderBottom: '1px solid var(--navy-100)', background: 'var(--navy-25)' }}>
+                  <span className={`carrier-badge ${carrier.toLowerCase()}`}>{carrier}</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  {accessByCarrier[carrier].map((vendor, idx) => (
+                    <div
+                      key={vendor.vendorId}
+                      style={{
+                        padding: '0.7rem 0.8rem',
+                        borderTop: idx === 0 ? 'none' : '1px solid var(--navy-50)',
+                        display: 'grid',
+                        gap: '0.75rem',
+                        alignItems: 'start',
+                      }}
+                      className="vendor-rate-grid"
+                    >
+                      <div>
+                        <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--navy-800)' }}>
+                          {vendor.vendorName}
+                          {vendor.vendorType === 'manifest' && (
+                            <span style={{ marginLeft: 6, fontSize: '0.7rem', color: 'var(--warning-600)', background: 'var(--warning-50)', border: '1px solid var(--warning-100)', borderRadius: 999, padding: '1px 6px' }}>
+                              Manifest
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--navy-600)', marginTop: 2 }}>
+                          {vendor.shippingService || 'Standard service'}
+                        </div>
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--navy-700)', lineHeight: 1.55 }}>
+                        {vendor.rateTiers?.length ? (
+                          vendor.rateTiers
+                            .slice()
+                            .sort((a, b) => a.minLbs - b.minLbs)
+                            .map((tier, tierIdx) => (
+                              <div key={`${vendor.vendorId}-${tierIdx}`}>
+                                {tier.minLbs}-{tier.maxLbs === null ? '∞' : tier.maxLbs} lbs: <strong>${tier.rate.toFixed(2)}</strong>
+                              </div>
+                            ))
+                        ) : (
+                          <div>
+                            All weights: <strong>${vendor.baseRate.toFixed(2)}</strong>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Recent Clients */}
@@ -706,7 +970,7 @@ const ResellerDashboard: React.FC<{ firstName: string }> = ({ firstName }) => {
               <div
                 key={c._id}
                 style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '0.75rem 1.5rem', borderBottom: '1px solid var(--navy-50)', transition: 'background 0.12s' }}
-                onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = '#f8fafc'}
+                onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = 'var(--navy-50)'}
                 onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = 'transparent'}
               >
                 <div className="avatar avatar-sm avatar-indigo" style={{ fontSize: '0.65rem', flexShrink: 0 }}>
@@ -716,10 +980,10 @@ const ResellerDashboard: React.FC<{ firstName: string }> = ({ firstName }) => {
                   <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--navy-800)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {c.firstName} {c.lastName}
                   </div>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--navy-400)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.email}</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--navy-500)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.email}</div>
                 </div>
                 <span style={{ width: 7, height: 7, borderRadius: '50%', background: c.isActive ? '#22c55e' : '#94a3b8', flexShrink: 0 }} />
-                <span style={{ fontSize: '0.7rem', color: 'var(--navy-400)', whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--navy-500)', whiteSpace: 'nowrap' }}>
                   {new Date(c.createdAt).toLocaleDateString()}
                 </span>
                 <button onClick={() => navigate('/reseller/clients')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-500)', padding: 4 }}>
@@ -730,6 +994,9 @@ const ResellerDashboard: React.FC<{ firstName: string }> = ({ firstName }) => {
           </div>
         )}
       </div>
+
+      {/* Quick Actions */}
+      <DashboardFAQ />
 
       {/* Quick Actions */}
       <div className="sh-card" style={{ padding: '1.3rem 1.5rem' }}>

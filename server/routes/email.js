@@ -92,8 +92,8 @@ router.post('/test', authenticateToken, authorize('admin'), async (req, res) => 
   try {
     await sendDummyEmail({
       to: req.user.email,
-      subject: 'Test Email - USPS Label Portal',
-      html: 'This is a test email from the USPS Label Portal system.'
+      subject: 'Test Email - Label Flow',
+      html: 'This is a test email from the Label Flow system.'
     });
 
     res.json({
